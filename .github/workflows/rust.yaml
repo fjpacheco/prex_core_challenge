@@ -12,6 +12,7 @@ env:
 jobs:
   build:
     runs-on: ubuntu-latest
+    name: Check formatting, lint, build and tests! 🚀
 
     steps:
     - name: Cache dependencies
