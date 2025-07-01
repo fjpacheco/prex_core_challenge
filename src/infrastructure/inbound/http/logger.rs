@@ -28,7 +28,7 @@ impl CustomLogger {
         let level = env::var("RUST_LOG")
             .unwrap_or("INFO".to_string())
             .parse::<LevelFilter>()
-            .unwrap();
+            .expect("RUST_LOG must be a valid level");
         println!(" . . . Setting {level:?}");
         let filter = EnvFilter::builder()
             .with_default_directive(level.into())

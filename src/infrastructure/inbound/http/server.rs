@@ -19,42 +19,43 @@ use crate::{
     },
 };
 
-#[derive(Debug, Clone)]
-pub struct HttpServerConfig<'a> {
-    pub host: &'a str,
-    pub port: u16,
-}
+const DEFAULT_HOST: &str = "127.0.0.1";
+const DEFAULT_PORT: u16 = 8080;
 
-pub struct HttpServer<'a> {
+pub struct HttpServer {
     server: actix_web::dev::Server,
-    config: HttpServerConfig<'a>,
+    host: String,
+    port: u16,
 }
 
-impl<'a> HttpServer<'a> {
-    pub fn new<T: ClientBalanceService>(
-        client_service: T,
-        config: HttpServerConfig<'a>,
-    ) -> Result<Self, anyhow::Error> {
+impl HttpServer {
+    pub fn new<T: ClientBalanceService>(client_service: T) -> Result<Self, anyhow::Error> {
         let arc_client_service = Arc::new(client_service);
 
+        let (host, port) = (Self::get_host(), Self::get_port());
         let server: actix_web::dev::Server = HttpServerAxum::new(move || {
             let client_service: web::Data<T> = web::Data::from(arc_client_service.clone());
             app_builder(client_service)
         })
-        .bind((config.host, config.port))?
+        .bind((host.as_str(), port))?
         .run();
 
-        Ok(Self { server, config })
+        Ok(Self { server, host, port })
     }
 
     pub async fn run(self) -> Result<(), anyhow::Error> {
-        tracing::info!(
-            "Starting HTTP server on {}:{} 🚀",
-            self.config.host,
-            self.config.port
-        );
+        tracing::info!("Starting HTTP server on {}:{} 🚀", self.host, self.port);
         self.server.await?;
         Ok(())
+    }
+
+    pub fn get_port() -> u16 {
+        let port = std::env::var("PORT").unwrap_or(DEFAULT_PORT.to_string());
+        port.parse::<u16>().expect("PORT must be a number")
+    }
+
+    pub fn get_host() -> String {
+        std::env::var("HOST").unwrap_or(DEFAULT_HOST.to_string())
     }
 }
 

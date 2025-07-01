@@ -1,5 +1,4 @@
 use prex_core_challenge::infrastructure::inbound::http::logger::CustomLogger;
-use prex_core_challenge::infrastructure::inbound::http::server::HttpServerConfig;
 use prex_core_challenge::infrastructure::outbound::{
     file_exporter::FileExporter, in_memory::InMemoryRepository,
 };
@@ -17,13 +16,7 @@ async fn main() -> Result<(), anyhow::Error> {
 
     let service_client = Service::new(in_memory_repository, file_exporter);
 
-    let server = HttpServer::new(
-        service_client,
-        HttpServerConfig {
-            host: "127.0.0.1",
-            port: 8080,
-        },
-    )?;
+    let server = HttpServer::new(service_client)?;
 
     server.run().await?;
     tracing::info!("Goodbye 👋");
