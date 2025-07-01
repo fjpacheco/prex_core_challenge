@@ -1,4 +1,10 @@
-use std::{collections::HashMap, sync::Arc};
+use std::{
+    collections::HashMap,
+    sync::{
+        Arc,
+        atomic::{AtomicUsize, Ordering},
+    },
+};
 
 use rust_decimal::Decimal;
 use tokio::sync::Mutex;
@@ -19,6 +25,7 @@ use crate::domain::{
 pub struct InMemoryRepository {
     clients: Arc<Mutex<HashMap<ClientId, Client>>>,
     client_balances: Arc<Mutex<HashMap<ClientId, Balance>>>,
+    id_counter: AtomicUsize,
 }
 
 impl Default for InMemoryRepository {
@@ -32,6 +39,7 @@ impl InMemoryRepository {
         Self {
             clients: Arc::new(Mutex::new(HashMap::new())),
             client_balances: Arc::new(Mutex::new(HashMap::new())),
+            id_counter: AtomicUsize::new(0),
         }
     }
 
@@ -55,7 +63,7 @@ impl InMemoryRepository {
 
 impl ClientBalanceRepository for InMemoryRepository {
     async fn create_client(&self, req: &CreateClientRequest) -> Result<Client, ClientError> {
-        let id = ClientId::default();
+        let id = ClientId::new(&self.id_counter.fetch_add(1, Ordering::Relaxed).to_string())?;
         let client = Client::new(
             id.clone(),
             req.name().clone(),

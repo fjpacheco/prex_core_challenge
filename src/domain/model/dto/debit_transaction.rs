@@ -44,7 +44,7 @@ mod tests {
 
     #[test]
     fn test_01_given_negative_amount_when_creating_debit_transaction_then_should_be_ok() {
-        let client_id = ClientId::default();
+        let client_id = ClientId::new("1").unwrap();
         let req = DebitTransactionRequest::new(client_id.clone(), Decimal::from(-100));
         assert!(req.is_ok());
         let req = req.unwrap();
@@ -54,7 +54,7 @@ mod tests {
 
     #[test]
     fn test_02_given_positive_amount_when_creating_debit_transaction_then_should_fail() {
-        let client_id = ClientId::default();
+        let client_id = ClientId::new("1").unwrap();
         let req = DebitTransactionRequest::new(client_id, Decimal::from(100));
         assert!(req.is_err());
         assert_eq!(req.err().unwrap(), ClientError::PositiveAmount);
@@ -62,7 +62,7 @@ mod tests {
 
     #[test]
     fn test_03_given_zero_amount_when_creating_debit_transaction_then_should_fail() {
-        let client_id = ClientId::default();
+        let client_id = ClientId::new("1").unwrap();
         let req = DebitTransactionRequest::new(client_id, Decimal::ZERO);
         assert!(req.is_err());
         assert_eq!(req.err().unwrap(), ClientError::ZeroAmount);

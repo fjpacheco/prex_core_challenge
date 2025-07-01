@@ -155,7 +155,7 @@ mod tests {
     fn test_03_given_two_not_found_by_id_errors_with_same_id_when_comparing_then_they_should_be_equal()
      {
         // GIVEN
-        let id = ClientId::default();
+        let id = ClientId::new("1").unwrap();
         let err1 = ClientError::NotFoundById {
             id_document: id.clone(),
         };
@@ -171,10 +171,10 @@ mod tests {
      {
         // GIVEN
         let err1 = ClientError::NotFoundById {
-            id_document: ClientId::default(),
+            id_document: ClientId::new("1").unwrap(),
         };
         let err2 = ClientError::NotFoundById {
-            id_document: ClientId::default(),
+            id_document: ClientId::new("2").unwrap(),
         };
         // THEN
         assert_ne!(err1, err2);
@@ -261,7 +261,7 @@ mod tests {
     fn test_09_given_all_variants_when_calling_code_then_should_return_expected_code() {
         // GIVEN
         let doc = "123".to_string();
-        let id = ClientId::default();
+        let id = ClientId::new("1").unwrap();
         let d = Document::new("A").unwrap();
         // THEN
         assert_eq!(
@@ -328,7 +328,7 @@ mod tests {
     fn test_10_given_all_variants_when_display_then_should_return_expected_message() {
         // GIVEN
         let doc = "123".to_string();
-        let id = ClientId::default();
+        let id = ClientId::new("1").unwrap();
         let d = Document::new("A").unwrap();
         // THEN
         assert_eq!(

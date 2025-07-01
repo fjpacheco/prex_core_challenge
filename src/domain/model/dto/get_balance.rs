@@ -29,7 +29,7 @@ mod tests {
     #[test]
     fn test_01_given_a_client_id_when_creating_get_client_request_then_field_should_be_accessible()
     {
-        let client_id = ClientId::default();
+        let client_id = ClientId::new("1").unwrap();
         let req = GetClientRequest::new(client_id.clone());
         assert_eq!(req.client_id(), &client_id);
     }

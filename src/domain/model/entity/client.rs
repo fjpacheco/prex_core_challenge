@@ -60,7 +60,7 @@ mod tests {
 
     #[test]
     fn test_01_given_valid_data_when_creating_client_then_fields_should_be_accessible() {
-        let id = ClientId::default();
+        let id = ClientId::new("1").unwrap();
         let name = ClientName::new("John Doe").unwrap();
         let birth_date = BirthDate::new("1990-01-01").unwrap();
         let document = Document::new("1234567890").unwrap();

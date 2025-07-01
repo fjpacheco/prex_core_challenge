@@ -174,7 +174,10 @@ where
 mod tests {
     use std::{
         collections::HashMap,
-        sync::{Arc, Mutex},
+        sync::{
+            Arc, Mutex,
+            atomic::{AtomicUsize, Ordering},
+        },
     };
 
     use rust_decimal::Decimal;
@@ -208,10 +211,12 @@ mod tests {
             client_balance_repository.unwrap_or_default();
         let (arc_mutex_clients_1, arc_mutex_client_balances_1) =
             (arc_mutex_clients.clone(), arc_mutex_client_balances.clone());
+        let id_counter = AtomicUsize::new(0);
         client_balance_repository
             .expect_create_client()
             .returning(move |req| {
-                let client_id = ClientId::default();
+                let client_id =
+                    ClientId::new(&id_counter.fetch_add(1, Ordering::Relaxed).to_string()).unwrap();
                 let client = Client::new(
                     client_id.clone(),
                     req.name().clone(),
@@ -536,7 +541,7 @@ mod tests {
         client_balance_repository
             .expect_init_client_balance()
             .returning(|_| {
-                Box::pin(async { Ok(Balance::new(ClientId::default(), Decimal::ZERO)) })
+                Box::pin(async { Ok(Balance::new(ClientId::new("1").unwrap(), Decimal::ZERO)) })
             });
         let (client_balance_repository, balance_exporter) = setup_general_mocks(
             Some((
@@ -716,7 +721,7 @@ mod tests {
         let client_balance_service = Service::new(client_balance_repository, balance_exporter);
 
         // GIVEN
-        let client_id = ClientId::default();
+        let client_id = ClientId::new("1").unwrap();
         let req = CreditTransactionRequest::new(client_id.clone(), Decimal::from(100)).unwrap();
 
         // WHEN
@@ -755,7 +760,7 @@ mod tests {
         let client_balance_service = Service::new(client_balance_repository, balance_exporter);
 
         // GIVEN
-        let client_id = ClientId::default();
+        let client_id = ClientId::new("1").unwrap();
         let req = CreditTransactionRequest::new(client_id.clone(), Decimal::from(100)).unwrap();
 
         // WHEN
@@ -776,7 +781,7 @@ mod tests {
         let client_balance_service = Service::new(client_balance_repository, balance_exporter);
 
         // GIVEN
-        let client_id = ClientId::default();
+        let client_id = ClientId::new("1").unwrap();
         let req = DebitTransactionRequest::new(client_id.clone(), Decimal::from(-100)).unwrap();
 
         // WHEN
@@ -815,7 +820,7 @@ mod tests {
         let client_balance_service = Service::new(client_balance_repository, balance_exporter);
 
         // GIVEN
-        let client_id = ClientId::default();
+        let client_id = ClientId::new("1").unwrap();
         let req = DebitTransactionRequest::new(client_id.clone(), Decimal::from(-100)).unwrap();
 
         // WHEN
@@ -836,7 +841,7 @@ mod tests {
         let client_balance_service = Service::new(client_balance_repository, balance_exporter);
 
         // GIVEN
-        let client_id = ClientId::default();
+        let client_id = ClientId::new("1").unwrap();
         let req = GetClientRequest::new(client_id.clone());
 
         // WHEN
@@ -875,7 +880,7 @@ mod tests {
         let client_balance_service = Service::new(client_balance_repository, balance_exporter);
 
         // GIVEN
-        let client_id = ClientId::default();
+        let client_id = ClientId::new("1").unwrap();
         let req = GetClientRequest::new(client_id.clone());
 
         // WHEN
@@ -896,7 +901,7 @@ mod tests {
         let client_balance_service = Service::new(client_balance_repository, balance_exporter);
 
         // GIVEN
-        let client_id = ClientId::default();
+        let client_id = ClientId::new("1").unwrap();
         let req = GetClientRequest::new(client_id.clone());
 
         // WHEN
@@ -935,7 +940,7 @@ mod tests {
         let client_balance_service = Service::new(client_balance_repository, balance_exporter);
 
         // GIVEN
-        let client_id = ClientId::default();
+        let client_id = ClientId::new("1").unwrap();
         let req = GetClientRequest::new(client_id.clone());
 
         // WHEN
