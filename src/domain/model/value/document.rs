@@ -29,3 +29,44 @@ impl Display for Document {
         f.write_str(&self.0)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_01_given_a_valid_document_when_creating_it_then_it_should_be_created() {
+        let doc = "1234567890";
+        let document = Document::new(doc).unwrap();
+        assert_eq!(document.to_string(), doc);
+    }
+
+    #[test]
+    fn test_02_given_an_empty_document_when_creating_it_then_it_should_fail() {
+        let doc = "";
+        let result = Document::new(doc);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_03_given_a_document_with_only_spaces_when_creating_it_then_it_should_fail() {
+        let doc = "    ";
+        let result = Document::new(doc);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_04_given_a_document_exceeding_max_length_when_creating_it_then_it_should_fail() {
+        let doc = "a".repeat(MAX_LENGTH_DOCUMENT + 1);
+        let result = Document::new(&doc);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_05_given_a_document_with_spaces_when_creating_it_then_it_should_be_trimmed_and_accepted()
+     {
+        let doc = "   1234567890   ";
+        let document = Document::new(doc).unwrap();
+        assert_eq!(document.to_string(), "1234567890");
+    }
+}
