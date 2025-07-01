@@ -105,7 +105,7 @@ Este proyecto fue desarrollado en la versión 1.88.0.
 
 ### Ejecución del servicio
 
-Para iniciar el servicio, se debe ejecutar el siguiente comando:
+Para iniciar el servicio de forma local, se debe ejecutar el siguiente comando:
 
 ```bash
 cargo run
@@ -117,7 +117,7 @@ Para ejecutar el servicio en modo de desarrollo, y en caso de disponer la tool d
 cargo watch -x run --ignore "*.DAT"
 ```
 
-Se ignoran los archivos `*.DAT` que genera el servicio para evitar un reinicio innecesario cuando se invoque el endpoint `store_balances`.****
+Se ignoran los archivos `*.DAT` que genera el servicio para evitar un reinicio innecesario cuando se invoque el endpoint `store_balances`.
 
 ### Ejecución de tests
 
@@ -127,7 +127,7 @@ Para ejecutar los tests, se debe ejecutar el siguiente comando:
 cargo test
 ```
 
-En caso de disponer de forma local la tool de `cargo-llvm-cov`, se puede ejecutar el siguiente comando para obtener el coverage de los tests:
+En caso de disponer de forma local la tool de `cargo-llvm-cov`, se puede ejecutar el siguiente comando para obtener el coverage de los tests de forma local:
 
 ```bash
 cargo llvm-cov --ignore-filename-regex "infrastructure|main.rs"
@@ -135,7 +135,7 @@ cargo llvm-cov --ignore-filename-regex "infrastructure|main.rs"
 
 #### Cobertura de tests
 
-La cobertura de tests cercana al 100% en la capa de **Domain** y **Application**. Esto se puede ver en Codecov.
+La cobertura de tests cercana al 100% en la capa de **Domain** y **Application**. Esto se puede ver en [Codecov](https://app.codecov.io/gh/fjpacheco/prex_core_challenge).
 
 ### Variables de entorno
 
@@ -144,52 +144,57 @@ El servicio puede tomar las siguientes variables de entorno:
 - `RUST_LOG`: Define el nivel de log del servicio. Por defecto es `info`.
 - `HOST`: Define el host del servicio. Por defecto es `127.0.0.1`.
 - `PORT`: Define el puerto del servicio. Por defecto es `8080`.
-- `FILE_EXPORT_DIRECTORY`: Define el directorio donde se exportarán los archivos. Por defecto es `.` en el directorio de ejecución del servicio.
+- `FILE_EXPORT_DIRECTORY`: Define el directorio donde se exportarán los archivos. Por defecto es `.` (en el mismo directorio de ejecución del servicio).
 
 ## Colección de Postman
 
-Se adjunta una colección de Postman para facilitar la prueba de la API REST del servicio.
-
-[Colección de Postman](./prex_core_challenge.postman_collection.json)
+Se adjunta una [Colección de Postman](./prex_core_challenge.postman_collection.json) para facilitar las pruebas de la API REST del servicio.
 
 ## Decisiones de diseño
 
 ### Arquitectura
 
-Fue vital la definición de una arquitectura para este proyecto. A pesar de ser una versión "mini" del desafío, se consideró importante para demostrar el uso de buenas prácticas de la ingeniería de software, mostrando una proactividad en el desarrollo.
+Fue vital la definición de una arquitectura para este proyecto. A pesar de ser una versión "mini" del desafío, se consideró importante para demostrar el uso de buenas prácticas de la ingeniería de software, mostrando una proactividad e investigación en el desarrollo.
 
-Se eligió una **arquitectura hexagonal**, ya que permite aislar la lógica del negocio de los detalles de infraestructura (como la persistencia de datos, comunicación con otros servicios, o la forma en que el servicio expone su API hacia el exterior), facilitando el testing, la mantenibilidad y la evolución del sistema.
+Se eligió una **arquitectura hexagonal**, ya que permite aislar la lógica del negocio de los detalles de infraestructura (como la persistencia y exportación de datos, comunicación con otros servicios, o la forma en que el servicio expone su API hacia el exterior), facilitando el testing, la mantenibilidad y la evolución del sistema.
 
 En este caso, se separó el código en las 3 capas de la arquitectura hexagonal:
 
 - **Domain**: Contiene modelos del dominio (como los DTOs, errores, entidades y valores con sus validaciones) que son las representaciones canónicas de la lógica del negocio. También incluye las traits/ports/interfaces (puntos de entrada y salida para la lógica del negocio).
-- **Application**: Encapsula todas las dependencias necesarias encargadas de ejecutar la lógica de negocio con sus casos de uso, exponiendo como servicio core de la aplicación.
+- **Application**: Encapsula todas las dependencias necesarias encargadas de ejecutar la lógica de negocio con sus casos de uso, exponiéndose como el servicio core de la aplicación.
 - **Infrastructure**: Implementa la lógica de infraestructura con los detalles concretos de los traits/ports/interfaces del modelo del dominio, exponiendo la API REST del servicio de aplicación, persistiendo datos en memoria y exportando datos a un archivo. El resultado de estas implementaciones también se lo conoce como los adapters de la arquitectura hexagonal.
 
-Hay muchas variantes de la arquitectura hexagonal, y se puede encontrar una gran cantidad de recursos en internet para entenderla y aplicarla en diferentes contextos. En mi caso adopté la  versión de arquitectura mencionada basandome en diversos recursos que menciono en la sección de [Referencias](#referencias).
+Hay muchas variantes de la arquitectura hexagonal, y se puede encontrar una gran cantidad de recursos en internet para entenderla y aplicarla en diferentes contextos. En mi caso adopté la versión de arquitectura mencionada basandome en diversos recursos que adjunto en la sección de [Referencias](#referencias).
 
 ### Testing
 
 Los tests se enfocaron en las capas de **Domain** y **Application**, principalmente con **testing unitario** mediante el uso del crate `mockall`.
-En la capa de **Infrastructure** se decidió no agregar tests, ya que solo interactúa con detalles externos, fuera de la lógica del negocio y el core de la aplicación. Además, puede ser costoso testearla para este “mini” proyecto. Sin embargo, sería fundamental testear esta capa en caso de buscar implementar **tests de integración**.
+
+En la capa de **Infrastructure** se decidió no agregar tests, ya que solo interactúa con detalles externos, fuera de la lógica del negocio con el core de la aplicación. Además, puede ser costoso testearla para este “mini” proyecto. Sin embargo, sería fundamental testear esta capa en caso de buscar implementar **tests de integración**.
 
 ### Persistencia de datos
 
 Tal como se enuncian en los requerimientos, los datos de clientes y sus balances se persisten en memoria.
 
-Pero dada la arquitectura definida, no sería complejo implementar una capa de persistencia en una base de datos como PostgreSQL/MySQL/MongoDB/etc. Esto se vio reflejado en el adapter de persistencia en memoria, donde en en (src/infrastructure/outbound/in_memory.rs) se puede ver cómo se implementa la persistencia en memoria con un simple HashMap, pero que en los tests unitarios se puede ver cómo se implementa el adaptar mediante mocks, pero que termina siendo en memoria con dos HashMap diferentes.
+Pero dada la arquitectura definida, no sería complejo agregar capa de persistencia en una base de datos como PostgreSQL/MySQL/MongoDB/etc. Esto se vio reflejado en el adapter de persistencia en memoria, donde en [in_memory.rs](src/infrastructure/outbound/in_memory.rs) se puede ver cómo se implementa la persistencia en memoria con un simple HashMap, pero que en los tests unitarios se puede ver cómo se implementa el adaptar mediante mocks, pero que también termina siendo en memoria con dos HashMap diferentes.
 
 #### Uso sincrónico de Mutex
 
+> [!IMPORTANT]
 Dado que nuestro trait/port/interface de persistencia indica que los clientes y balances pueden ser accedidos concurrentemente por múltiples tareas asincrónicas (gracias al runtime de Tokio), debemos encontrar una forma segura de sincronizar el acceso mutable de los datos compartidos.
 
-Para dicha persistencia se uso un `Mutex` sincronico de la libreria estandar de Rust dado que es una [recomendación](https://docs.rs/tokio/latest/tokio/sync/struct.Mutex.html#which-kind-of-mutex-should-you-use) dada por el mismo crate de `tokio`. 
+Para dicha persistencia se uso un [Mutex](https://doc.rust-lang.org/std/sync/struct.Mutex.html) sincronico de la libreria estándar de Rust dado que es una [recomendación](https://docs.rs/tokio/latest/tokio/sync/struct.Mutex.html#which-kind-of-mutex-should-you-use) dada por el mismo crate de `tokio`. 
 
 El motivo se debe a que el [Mutex](https://doc.rust-lang.org/std/sync/struct.Mutex.html) sincrónico de la libreria estándar es mas performante que el [Mutex](https://docs.rs/tokio/latest/tokio/sync/struct.Mutex.html) asincrónico de tokio para los casos donde solo se acceden a datos sin un acceso de recursos de I/O tales como una base de datos.
 
-Además que en el adaptador/implementación de persistencia en memoria no se cruza con ningún acceso de recursos de I/O, ni tampoco con otro punto .await durante el CRUD de las entidades.
+Además que en el adaptador/implementación de persistencia en memoria no se cruza con ningún acceso de recursos de I/O, ni tampoco se realiza un .await mientras se tiene tiene el lock del Mutex.
 
-Si tuviéramos un recurso de I/O, como una base de datos, ahí sí conviene usar el Mutex asincrónico para proveer el acceso mutable compartido a esa conexión a la base de datos.
+Si tuviéramos un recurso de I/O, como una base de datos, ahí sí conviene usar el Mutex asincrónico para proveer el acceso mutable compartido a esa conexión o pool de conexiones a la base de datos.
+
+> [!TIP]
+> Citando a [Alice Ryhl](https://www.linkedin.com/in/aliceryhl/), Maintener de Tokio: "_You should only use an asynchronous lock if you need to .await something while the lock is locked. Usually, this is not necessary, and you should avoid using an asynchronous lock when you can. Asynchronous locks are a lot slower than blocking locks._"
+>
+> https://draft.ryhl.io/blog/shared-mutable-state/
 
 ### Exportación de datos
 
@@ -212,20 +217,31 @@ Se tomó en cuenta la siguiente consideración para la validación de los reques
 
 #### Límites de los campos
 
-Se agregaron límites de longitudes máximos recibidos en los requests para evitar sobrecargar la información que se maneja en el sistema.
-Además que no los campos no pueden ser vacíos e inválidos.
+Se agregaron límites de longitudes máximos recibidos en los requests para evitar sobrecargar la información que se maneja en el servidor. Además que los campos no pueden ser vacíos e inválidos.
 
 ### Dominio: Clientes y Balances
 
 Se decidió que el Cliente y el Balance sean dos entidades separadas dentro del mismo modelo del dominio, pero que están estrechamente relacionadas formando un todo como "Balance del Cliente" como servicio core final. 
 
-Al separar dichas entidades se logra una mayor flexibilidad para agregar más información al balance en el futuro cumpliendo con el principio de responsabilidad única de los principios SOLID. El cliente solo se encargará de contener información del usuario y el balance se encargará de contener la información del balance del cliente. Pero incluso a la larga si llegan a crecer ambas entidades, y sus operaciones logran ser ser independientes, con la arquitectura definida se podría incluso separar en 2 dominios diferentes, uno para el cliente y otro para el balance. Aunque esto agregaría el coste de la comunicación entre ambos dominios, con el desafío de lograr la atomicidad entre ambas entidades. Dicha separación de dominios puede dar entrada a la separación en una arquitectura de microservicios, separando cada dominio en un microservicio diferente.
+Al separar dichas entidades se logra una mayor flexibilidad para agregar en el futuro más información al balance, cumpliendo con el principio de responsabilidad única de los principios SOLID puesto que el cliente solo se encargará de contener información del usuario y el balance se encargará de contener la información del balance del cliente. Pero incluso a la larga si llegan a crecer ambas entidades, y sus operaciones logran ser ser independientes, con la arquitectura definida se podría incluso separar en 2 dominios diferentes, uno para el cliente y otro para el balance. Aunque esto agregaría el coste de la comunicación entre ambos dominios, con el desafío de lograr la atomicidad entre ambas entidades. Dicha separación de dominios puede dar entrada a la separación en una arquitectura de microservicios, separando cada dominio en un microservicio diferente.
 
 Como era a criterio del lector, en el servicio de `GET /client_balance` se decidió obtener toda la información del cliente y su balance para evitar que los consumidores de la API tengan que hacer 2 llamadas para obtener la información del cliente y luego la información del balance. Pero tal como se menciona en el requerimiento, según cómo crezcan dichas entidades, podría ser viable obtener solo información del cliente o solo información del balance con diferentes endpoints.
 
+## Integración continua
+
+Adicionalmente se agregó un workflow de CI para que en cada push a master se realicen las siguientes acciones y validaciones:
+
+- Revisión de formato de código con [rustfmt](https://github.com/rust-lang/rustfmt).
+- Revisión de lints de código con [clippy](https://github.com/rust-lang/rust-clippy).
+- Build del proyecto correcto.
+- Ejecución de tests.
+- Generación de cobertura de tests y reporte en [Codecov](https://app.codecov.io/gh/fjpacheco/prex_core_challenge).
+
+A futuro se podría agregar un workflow de CD (Continuous Deployment) para que en cada push a master se realice el despliegue del servicio en la nube y/o en un contenedor de Docker.
+
 ### Referencias
 
-Algunos recursos por los que me vi obligado a explorar para entender más sobre la arquitectura hexagonal y sus miles de variantes:
+Algunos recursos por los que me vi obligado a explorar para entender más sobre la arquitectura hexagonal y sus miles de variantes + otros recursos:
 
 - https://herbertograca.com/2017/11/16/explicit-architecture-01-ddd-hexagonal-onion-clean-cqrs-how-i-put-it-all-together/
 - https://www.happycoders.eu/software-craftsmanship/hexagonal-architecture/
@@ -243,3 +259,4 @@ Algunos recursos por los que me vi obligado a explorar para entender más sobre 
 - https://blog.allegro.tech/2020/05/hexagonal-architecture-by-example.html
 - https://github.com/PacktPublishing/Designing-Hexagonal-Architecture-with-Java/tree/main
 - https://docs.rs/tokio/latest/tokio/sync/struct.Mutex.html#which-kind-of-mutex-should-you-use
+- https://draft.ryhl.io/blog/shared-mutable-state/

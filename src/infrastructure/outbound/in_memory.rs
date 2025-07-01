@@ -63,10 +63,8 @@ impl InMemoryRepository {
         client_balance.1 = new_decimal_balance;
         Ok(Balance::new(client_id.clone(), new_decimal_balance))
     }
-}
 
-impl ClientBalanceRepository for InMemoryRepository {
-    async fn create_client(&self, req: &CreateClientRequest) -> Result<Client, ClientError> {
+    fn _create_client(&self, req: &CreateClientRequest) -> Result<Client, ClientError> {
         let id = ClientId::new(&self.id_counter.fetch_add(1, Ordering::Relaxed).to_string())?;
         let client = Client::new(
             id.clone(),
@@ -88,12 +86,12 @@ impl ClientBalanceRepository for InMemoryRepository {
         Ok(client)
     }
 
-    async fn client_id_exists(&self, client_id: &ClientId) -> Result<bool, ClientError> {
+    fn _client_id_exists(&self, client_id: &ClientId) -> Result<bool, ClientError> {
         let clients = self.guard_clients()?;
         Ok(clients.contains_key(client_id))
     }
 
-    async fn get_client_by_document(&self, document: &Document) -> Result<Client, ClientError> {
+    fn _get_client_by_document(&self, document: &Document) -> Result<Client, ClientError> {
         let clients = self.guard_clients()?;
         let (_, (client, _)) = clients
             .iter()
@@ -104,11 +102,11 @@ impl ClientBalanceRepository for InMemoryRepository {
         Ok(client.clone())
     }
 
-    async fn credit_balance(&self, req: &CreditTransactionRequest) -> Result<Balance, ClientError> {
+    fn _credit_balance(&self, req: &CreditTransactionRequest) -> Result<Balance, ClientError> {
         self.update_balance(req.client_id(), req.amount())
     }
 
-    async fn get_client(&self, req: &GetClientRequest) -> Result<Client, ClientError> {
+    fn _get_client(&self, req: &GetClientRequest) -> Result<Client, ClientError> {
         let clients = self.guard_clients()?;
         let (client, _) = clients
             .get(req.client_id())
@@ -118,14 +116,11 @@ impl ClientBalanceRepository for InMemoryRepository {
         Ok(client.clone())
     }
 
-    async fn debit_balance(&self, req: &DebitTransactionRequest) -> Result<Balance, ClientError> {
+    fn _debit_balance(&self, req: &DebitTransactionRequest) -> Result<Balance, ClientError> {
         self.update_balance(req.client_id(), req.amount())
     }
 
-    async fn get_balance_by_client_id(
-        &self,
-        req: &GetClientRequest,
-    ) -> Result<Balance, ClientError> {
+    fn _get_balance_by_client_id(&self, req: &GetClientRequest) -> Result<Balance, ClientError> {
         let client_balances = self.guard_clients()?;
         let (client, balance) =
             client_balances
@@ -136,7 +131,7 @@ impl ClientBalanceRepository for InMemoryRepository {
         Ok(Balance::new(client.id().clone(), *balance))
     }
 
-    async fn reset_all_balances_to_zero(&self) -> Result<Vec<Balance>, ClientError> {
+    fn _reset_all_balances_to_zero(&self) -> Result<Vec<Balance>, ClientError> {
         let mut clients = self.guard_clients()?;
         let old_balances = clients
             .values_mut()
@@ -149,15 +144,12 @@ impl ClientBalanceRepository for InMemoryRepository {
         Ok(old_balances)
     }
 
-    async fn are_balances_empty(&self) -> Result<bool, ClientError> {
+    fn _are_balances_empty(&self) -> Result<bool, ClientError> {
         let clients = self.guard_clients()?;
         Ok(clients.is_empty())
     }
 
-    async fn merge_old_balances(
-        &self,
-        old_client_balances: Vec<Balance>,
-    ) -> Result<(), ClientError> {
+    fn _merge_old_balances(&self, old_client_balances: Vec<Balance>) -> Result<(), ClientError> {
         let mut clients = self.guard_clients()?;
         old_client_balances.iter().for_each(|old_client_balance| {
             let old_balance = old_client_balance.balance();
@@ -172,5 +164,53 @@ impl ClientBalanceRepository for InMemoryRepository {
             }
         });
         Ok(())
+    }
+}
+
+impl ClientBalanceRepository for InMemoryRepository {
+    async fn create_client(&self, req: &CreateClientRequest) -> Result<Client, ClientError> {
+        self._create_client(req)
+    }
+
+    async fn client_id_exists(&self, client_id: &ClientId) -> Result<bool, ClientError> {
+        self._client_id_exists(client_id)
+    }
+
+    async fn get_client_by_document(&self, document: &Document) -> Result<Client, ClientError> {
+        self._get_client_by_document(document)
+    }
+
+    async fn credit_balance(&self, req: &CreditTransactionRequest) -> Result<Balance, ClientError> {
+        self._credit_balance(req)
+    }
+
+    async fn get_client(&self, req: &GetClientRequest) -> Result<Client, ClientError> {
+        self._get_client(req)
+    }
+
+    async fn debit_balance(&self, req: &DebitTransactionRequest) -> Result<Balance, ClientError> {
+        self._debit_balance(req)
+    }
+
+    async fn get_balance_by_client_id(
+        &self,
+        req: &GetClientRequest,
+    ) -> Result<Balance, ClientError> {
+        self._get_balance_by_client_id(req)
+    }
+
+    async fn reset_all_balances_to_zero(&self) -> Result<Vec<Balance>, ClientError> {
+        self._reset_all_balances_to_zero()
+    }
+
+    async fn are_balances_empty(&self) -> Result<bool, ClientError> {
+        self._are_balances_empty()
+    }
+
+    async fn merge_old_balances(
+        &self,
+        old_client_balances: Vec<Balance>,
+    ) -> Result<(), ClientError> {
+        self._merge_old_balances(old_client_balances)
     }
 }
