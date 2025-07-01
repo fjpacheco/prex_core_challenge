@@ -1,10 +1,10 @@
 {
 	"info": {
-		"_postman_id": "0e06cfd4-fc31-4964-a737-9e5e7776afba",
+		"_postman_id": "01c12703-1da3-42da-a1b9-5b9f2dcf3bd4",
 		"name": "Prex Core Challenge",
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
 		"_exporter_id": "24255620",
-		"_collection_link": "https://red-water-908878.postman.co/workspace/Team-Workspace~247ebaf5-75d9-4921-8339-190cd4c21486/collection/24255620-0e06cfd4-fc31-4964-a737-9e5e7776afba?action=share&source=collection_link&creator=24255620"
+		"_collection_link": "https://red-water-908878.postman.co/workspace/Team-Workspace~247ebaf5-75d9-4921-8339-190cd4c21486/collection/24255620-01c12703-1da3-42da-a1b9-5b9f2dcf3bd4?action=share&source=collection_link&creator=24255620"
 	},
 	"item": [
 		{
@@ -148,15 +148,6 @@
 			"request": {
 				"method": "POST",
 				"header": [],
-				"body": {
-					"mode": "raw",
-					"raw": "{\n    \"client_id\" : 123,\n    \"amount\": 10\n}",
-					"options": {
-						"raw": {
-							"language": "json"
-						}
-					}
-				},
 				"url": {
 					"raw": "{{base_url}}/new_credit_transaction",
 					"host": [
