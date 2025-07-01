@@ -23,10 +23,10 @@ El saldo y toda la base de clientes deberá poder persistirse en un archivo medi
 El servicio debe recibir el siguiente body
 ```json
 {
-    "name": "Federico Jose Pacheco", 
-    "birth_date": "1999-03-07", 
-    "document": "111111111", 
-    "country": "Argentina"
+    "name": <STRING>, 
+    "birth_date": <NAIVEDATE>, 
+    "document": <STRING>, 
+    "country": <STRING>
 }
 ```
 
@@ -78,10 +78,14 @@ Se presenta a continuación un ejemplo de formato del archivo:
 1234567891 200.25
 1234567892 300.50
 
-ID_CLIENTE<espacio>BALANCE<Salto de línea>
-ID_CLIENTE<espacio>BALANCE<Salto de línea>
-ID_CLIENTE<espacio>BALANCE<Salto de línea>
-ID_CLIENTE<espacio>BALANCE<Salto de línea>
+ID_CLIENTE<espacio>BALANCE<Salto 
+de                           línea>
+ID_CLIENTE<espacio>BALANCE<Salto
+de                           línea>
+ID_CLIENTE<espacio>BALANCE<Salto
+de                           línea>
+ID_CLIENTE<espacio>BALANCE<Salto
+de                           línea>
 ```
 
 ### GET “client_balance”
@@ -106,7 +110,7 @@ Para iniciar el servicio, se debe ejecutar el siguiente comando:
 cargo run
 ```
 
-Para ejecutar el servicio en modo de desarrollo, y en caso de disponer la tool de `cargo-watch`, que se reinicie automáticamente cuando se realicen cambios en el código, se puede ejecutar el siguiente comando:
+Para ejecutar el servicio en modo de desarrollo, y en caso de disponer la tool de `cargo-watch`, se puede ejecutar el siguiente comando para que se reinicie automáticamente el servidor cuando se realicen cambios en el código:
 
 ```bash
 cargo watch -x run --ignore "*.DAT"

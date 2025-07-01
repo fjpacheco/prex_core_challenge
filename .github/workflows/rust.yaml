@@ -24,6 +24,7 @@ jobs:
           ~/.cargo/registry
           ~/.cargo/git
           target
+          lcov.info
         key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
     - name: Check formatting
