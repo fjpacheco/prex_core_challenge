@@ -345,7 +345,44 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_02_given_a_client_created_when_getting_client_balance_then_it_should_return_the_client_balance_equal_to_zero()
+    async fn test_02_given_two_clients_with_the_same_document_when_creating_it_then_it_should_return_an_error()
+     {
+        // SETUP
+        let (client_balance_repository, balance_exporter) = setup_mocks();
+        let client_balance_service = Service::new(client_balance_repository, balance_exporter);
+
+        // GIVEN
+        let document = "1234567890";
+        let req_create_1 = CreateClientRequest::new(
+            ClientName::new("John Doe").unwrap(),
+            BirthDate::new("1990-01-01").unwrap(),
+            Document::new(document).unwrap(),
+            Country::new("US").unwrap(),
+        );
+        let req_create_2 = CreateClientRequest::new(
+            ClientName::new("John Doe").unwrap(),
+            BirthDate::new("1990-01-01").unwrap(),
+            Document::new(document).unwrap(),
+            Country::new("US").unwrap(),
+        );
+
+        // WHEN
+        let result_create_1 = client_balance_service.create_client(&req_create_1).await;
+        let result_create_2 = client_balance_service.create_client(&req_create_2).await;
+
+        // ASSERT
+        assert!(result_create_1.is_ok());
+        assert!(result_create_2.is_err());
+        assert_eq!(
+            result_create_2.err().unwrap(),
+            ClientError::Duplicate {
+                document: document.to_string(),
+            }
+        );
+    }
+
+    #[tokio::test]
+    async fn test_03_given_a_client_created_when_getting_client_balance_then_it_should_return_the_client_balance_equal_to_zero()
      {
         // SETUP
         let (client_balance_repository, balance_exporter) = setup_mocks();
@@ -374,7 +411,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_03_given_a_client_created_when_credit_balance_then_it_should_be_updated_with_the_new_balance()
+    async fn test_04_given_a_client_created_when_credit_balance_then_it_should_be_updated_with_the_new_balance()
      {
         // SETUP
         let (client_balance_repository, balance_exporter) = setup_mocks();
@@ -412,7 +449,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_04_given_a_client_created_when_credit_and_debit_balance_then_it_should_be_updated_with_the_new_balance()
+    async fn test_05_given_a_client_created_when_credit_and_debit_balance_then_it_should_be_updated_with_the_new_balance()
      {
         // SETUP
         let (client_balance_repository, balance_exporter) = setup_mocks();

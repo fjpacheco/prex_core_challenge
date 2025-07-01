@@ -41,6 +41,54 @@ pub enum ClientError {
     Unknown(#[from] anyhow::Error),
 }
 
+impl PartialEq for ClientError {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (ClientError::Duplicate { document: d1 }, ClientError::Duplicate { document: d2 }) => {
+                d1 == d2
+            }
+            (
+                ClientError::NotFoundById { id_document: id1 },
+                ClientError::NotFoundById { id_document: id2 },
+            ) => id1 == id2,
+            (
+                ClientError::NotFoundByDocument { document: d1 },
+                ClientError::NotFoundByDocument { document: d2 },
+            ) => d1 == d2,
+            (
+                ClientError::FieldEmpty { field_name: f1 },
+                ClientError::FieldEmpty { field_name: f2 },
+            ) => f1 == f2,
+            (
+                ClientError::FieldInvalid {
+                    field_name: f1,
+                    value: v1,
+                },
+                ClientError::FieldInvalid {
+                    field_name: f2,
+                    value: v2,
+                },
+            ) => f1 == f2 && v1 == v2,
+            (
+                ClientError::FieldMaxLength {
+                    field_name: f1,
+                    max_length: m1,
+                },
+                ClientError::FieldMaxLength {
+                    field_name: f2,
+                    max_length: m2,
+                },
+            ) => f1 == f2 && m1 == m2,
+            (ClientError::NegativeAmount, ClientError::NegativeAmount) => true,
+            (ClientError::PositiveAmount, ClientError::PositiveAmount) => true,
+            (ClientError::ZeroAmount, ClientError::ZeroAmount) => true,
+            (ClientError::BalancesEmpty, ClientError::BalancesEmpty) => true,
+            (ClientError::Unknown(_), ClientError::Unknown(_)) => true,
+            _ => false,
+        }
+    }
+}
+
 impl ClientError {
     /// Code error personalized for the client domain!
     pub fn code(&self) -> String {
