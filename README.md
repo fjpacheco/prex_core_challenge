@@ -2,13 +2,14 @@
 
 # Prex Core Challenge
 
-Este proyecto es una implementación para el desafío técnico de Prex. El mismo corresponde a un “mini procesador de pagos” con la
-capacidad de llevar el saldo de los clientes en memoria y persistirlos (cuando se solicite) en un archivo. Esto es mediante la implementación de un micro servicio que exponga una API REST al usuario (al referirnos a un procesador de pagos, el usuario del mismo es un emisor de tarjetas y/o servicios de pago, no así el cliente final), a través de la cual pueda llevar un registro del saldo de sus clientes.
+Microservicio de pagos (mini procesador de pagos) en **Rust**, implementado con una **arquitectura hexagonal**. Permite gestionar clientes y sus balances, acreditando, debitando, consultando y exportando saldos a través de una API REST. La solución está diseñada para que la persistencia y exportación de datos sea flexible: por defecto, los datos se mantienen en memoria y se exportan a archivos. El proyecto prioriza buenas prácticas de ingeniería de software, aplicando principios de buen diseño y testeo exhaustivo en la lógica de negocio. Ideal como ejemplo de arquitectura limpia, escalable y mantenible en Rust.
 
 <details>
 <summary><b>Definición de requerimientos</b></summary>
 
 ## Definición de requerimientos
+
+Este proyecto es una implementación para el desafío técnico de Prex. El mismo corresponde a un “mini procesador de pagos” con la capacidad de llevar el saldo de los clientes en memoria y persistirlos (cuando se solicite) en un archivo. Esto es mediante la implementación de un micro servicio que exponga una API REST al usuario (al referirnos a un procesador de pagos, el usuario del mismo es un emisor de tarjetas y/o servicios de pago, no así el cliente final), a través de la cual pueda llevar un registro del saldo de sus clientes.
 
 El servicio recibirá instrucciones a través de su API REST para acreditar o debitar saldo a los clientes. Cada cliente deberá ser creado inicialmente mediante el servicio "new_client" y luego podrá recibir tanto débitos (resta al saldo) como créditos (suma al
 saldo).
@@ -116,7 +117,7 @@ Para ejecutar el servicio en modo de desarrollo, y en caso de disponer la tool d
 cargo watch -x run --ignore "*.DAT"
 ```
 
-Se ignoran los archivos `*.DAT` que genera el servicio para evitar un reinicio innecesario cuando se invoque el endpoint `store_balances`.
+Se ignoran los archivos `*.DAT` que genera el servicio para evitar un reinicio innecesario cuando se invoque el endpoint `store_balances`.****
 
 ### Ejecución de tests
 
