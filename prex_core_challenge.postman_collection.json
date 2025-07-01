@@ -1,10 +1,10 @@
 {
 	"info": {
-		"_postman_id": "01c12703-1da3-42da-a1b9-5b9f2dcf3bd4",
+		"_postman_id": "60bb93cd-e152-40d4-a048-f7eab180ce25",
 		"name": "Prex Core Challenge",
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
 		"_exporter_id": "24255620",
-		"_collection_link": "https://red-water-908878.postman.co/workspace/Team-Workspace~247ebaf5-75d9-4921-8339-190cd4c21486/collection/24255620-01c12703-1da3-42da-a1b9-5b9f2dcf3bd4?action=share&source=collection_link&creator=24255620"
+		"_collection_link": "https://red-water-908878.postman.co/workspace/Team-Workspace~247ebaf5-75d9-4921-8339-190cd4c21486/collection/24255620-60bb93cd-e152-40d4-a048-f7eab180ce25?action=share&source=collection_link&creator=24255620"
 	},
 	"item": [
 		{
@@ -124,7 +124,7 @@
 				"header": [],
 				"body": {
 					"mode": "raw",
-					"raw": "{\n    \"client_id\" : \"{{last_user_id_created}}\",\n    \"amount\": 10\n}",
+					"raw": "{\n    \"client_id\" : \"{{last_user_id_created}}\",\n    \"amount\": -10\n}",
 					"options": {
 						"raw": {
 							"language": "json"
@@ -132,12 +132,12 @@
 					}
 				},
 				"url": {
-					"raw": "{{base_url}}/new_credit_transaction",
+					"raw": "{{base_url}}/new_debit_transaction",
 					"host": [
 						"{{base_url}}"
 					],
 					"path": [
-						"new_credit_transaction"
+						"new_debit_transaction"
 					]
 				}
 			},
@@ -149,12 +149,12 @@
 				"method": "POST",
 				"header": [],
 				"url": {
-					"raw": "{{base_url}}/new_credit_transaction",
+					"raw": "{{base_url}}/store_balances",
 					"host": [
 						"{{base_url}}"
 					],
 					"path": [
-						"new_credit_transaction"
+						"store_balances"
 					]
 				}
 			},
