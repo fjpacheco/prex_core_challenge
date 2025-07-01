@@ -1,0 +1,196 @@
+{
+	"info": {
+		"_postman_id": "cc3e3aa5-7a2b-4466-ad59-af463298fe11",
+		"name": "Prex Core Challenge",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "24255620",
+		"_collection_link": "https://red-water-908878.postman.co/workspace/Team-Workspace~247ebaf5-75d9-4921-8339-190cd4c21486/collection/24255620-cc3e3aa5-7a2b-4466-ad59-af463298fe11?action=share&source=collection_link&creator=24255620"
+	},
+	"item": [
+		{
+			"name": "New Client",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code is 200\", function () {",
+							"    pm.response.to.have.status(200);",
+							"});",
+							"pm.variables.set(\"variable_key\", \"variable_value\");",
+							"pm.test(\"Status code name has string\", function () {",
+							"    pm.response.to.have.status(\"Created\");",
+							"});",
+							"pm.test(\"Successful POST request\", function () {",
+							"pm.variables.set(\"variable_key\", \"variable_value\");",
+							"});"
+						],
+						"type": "text/javascript",
+						"packages": {}
+					}
+				},
+				{
+					"listen": "prerequest",
+					"script": {
+						"exec": [
+							""
+						],
+						"type": "text/javascript",
+						"packages": {}
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"name\": \"Federico Jose Pacheco\", \n    \"birth_date\": \"1999-03-07\", \n    \"document\": \"11111112\", \n    \"country\": \"Argentina\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{base_url}}/create_client",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"create_client"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Client Balance",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "{{base_url}}/client_balance/{{last_user_id_created}}",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"client_balance",
+						"{{last_user_id_created}}"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "New Credit Transaction",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"client_id\" : 123,\n    \"amount\": 10\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{base_url}}/new_credit_transaction",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"new_credit_transaction"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "New Debit Transaction",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"client_id\" : 123,\n    \"amount\": 10\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{base_url}}/new_credit_transaction",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"new_credit_transaction"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Store Balances",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"client_id\" : 123,\n    \"amount\": 10\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{base_url}}/new_credit_transaction",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"new_credit_transaction"
+					]
+				}
+			},
+			"response": []
+		}
+	],
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://127.0.0.1:8080",
+			"type": "default"
+		},
+		{
+			"key": "user_id",
+			"value": "",
+			"type": "default"
+		},
+		{
+			"key": "base_url",
+			"value": ""
+		},
+		{
+			"key": "last_user_id_created",
+			"value": ""
+		}
+	]
+}
