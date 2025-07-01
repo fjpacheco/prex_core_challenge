@@ -9,15 +9,18 @@ use crate::domain::{
 };
 
 const FILE_EXTENSION: &str = ".DAT";
-const DIRECTORY: &str = ".";
+const DEFAULT_DIRECTORY: &str = ".";
 
 pub struct FileExporter {
     counter: AtomicUsize,
+    directory: String,
 }
 
 impl FileExporter {
     pub async fn new() -> Result<Self, anyhow::Error> {
-        let mut entries = tokio::fs::read_dir(DIRECTORY).await?;
+        let directory =
+            std::env::var("FILE_EXPORT_DIRECTORY").unwrap_or(DEFAULT_DIRECTORY.to_string());
+        let mut entries = tokio::fs::read_dir(&directory).await?;
         let mut last_file_counter = 0;
 
         while let Some(entry) = entries.next_entry().await? {
@@ -33,6 +36,7 @@ impl FileExporter {
 
         Ok(Self {
             counter: AtomicUsize::new(last_file_counter),
+            directory,
         })
     }
 }
@@ -68,7 +72,7 @@ impl BalanceExporter for FileExporter {
 
         let file_name = format!("{}_{}.DAT", chrono::Utc::now().format("%d%m%Y"), counter);
 
-        let file_path = format!("{DIRECTORY}/{file_name}");
+        let file_path = format!("{}/{}", self.directory, file_name);
         let mut file = File::create(&file_path)
             .await
             .with_context(|| format!("Error creating file: {file_path}"))?;
