@@ -105,7 +105,7 @@ Este proyecto fue desarrollado en la versión 1.88.0.
 
 ### Ejecución del servicio
 
-Para iniciar el servicio, se debe ejecutar el siguiente comando:
+Para iniciar el servicio de forma local, se debe ejecutar el siguiente comando:
 
 ```bash
 cargo run
@@ -135,7 +135,7 @@ cargo llvm-cov --ignore-filename-regex "infrastructure|main.rs"
 
 #### Cobertura de tests
 
-La cobertura de tests cercana al 100% en la capa de **Domain** y **Application**. Esto se puede ver en Codecov.
+La cobertura de tests cercana al 100% en la capa de **Domain** y **Application**. Esto se puede ver en [Codecov](https://app.codecov.io/gh/fjpacheco/prex_core_challenge).
 
 ### Variables de entorno
 
@@ -222,6 +222,18 @@ Se decidió que el Cliente y el Balance sean dos entidades separadas dentro del 
 Al separar dichas entidades se logra una mayor flexibilidad para agregar más información al balance en el futuro cumpliendo con el principio de responsabilidad única de los principios SOLID. El cliente solo se encargará de contener información del usuario y el balance se encargará de contener la información del balance del cliente. Pero incluso a la larga si llegan a crecer ambas entidades, y sus operaciones logran ser ser independientes, con la arquitectura definida se podría incluso separar en 2 dominios diferentes, uno para el cliente y otro para el balance. Aunque esto agregaría el coste de la comunicación entre ambos dominios, con el desafío de lograr la atomicidad entre ambas entidades. Dicha separación de dominios puede dar entrada a la separación en una arquitectura de microservicios, separando cada dominio en un microservicio diferente.
 
 Como era a criterio del lector, en el servicio de `GET /client_balance` se decidió obtener toda la información del cliente y su balance para evitar que los consumidores de la API tengan que hacer 2 llamadas para obtener la información del cliente y luego la información del balance. Pero tal como se menciona en el requerimiento, según cómo crezcan dichas entidades, podría ser viable obtener solo información del cliente o solo información del balance con diferentes endpoints.
+
+## Integración continua
+
+Adicionalmente se agregó un workflow de CI para que en cada push a master se realicen las siguientes acciones:
+
+- Revisión de formato de código con [rustfmt](https://github.com/rust-lang/rustfmt).
+- Revisión de lints de código con [clippy](https://github.com/rust-lang/rust-clippy).
+- Build del proyecto correcto.
+- Ejecución de tests.
+- Generación de cobertura de tests y reporte de cobertura en [Codecov](https://app.codecov.io/gh/fjpacheco/prex_core_challenge).
+
+A futuro se podría agregar un workflow de CD para que en cada push a master se realice el build y se despliegue el servicio en la nube y/o en un contenedor de Docker.
 
 ### Referencias
 
