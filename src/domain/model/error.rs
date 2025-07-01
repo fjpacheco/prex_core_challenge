@@ -123,57 +123,87 @@ mod tests {
     use anyhow::anyhow;
 
     #[test]
-    fn test_01_given_two_duplicate_errors_with_same_document_when_comparing_then_they_should_be_equal() {
+    fn test_01_given_two_duplicate_errors_with_same_document_when_comparing_then_they_should_be_equal()
+     {
         // GIVEN
         let doc = "123".to_string();
-        let err1 = ClientError::Duplicate { document: doc.clone() };
-        let err2 = ClientError::Duplicate { document: doc.clone() };
+        let err1 = ClientError::Duplicate {
+            document: doc.clone(),
+        };
+        let err2 = ClientError::Duplicate {
+            document: doc.clone(),
+        };
         // THEN
         assert_eq!(err1, err2);
     }
 
     #[test]
-    fn test_02_given_two_duplicate_errors_with_different_document_when_comparing_then_they_should_not_be_equal() {
+    fn test_02_given_two_duplicate_errors_with_different_document_when_comparing_then_they_should_not_be_equal()
+     {
         // GIVEN
-        let err1 = ClientError::Duplicate { document: "123".to_string() };
-        let err2 = ClientError::Duplicate { document: "456".to_string() };
+        let err1 = ClientError::Duplicate {
+            document: "123".to_string(),
+        };
+        let err2 = ClientError::Duplicate {
+            document: "456".to_string(),
+        };
         // THEN
         assert_ne!(err1, err2);
     }
 
     #[test]
-    fn test_03_given_two_not_found_by_id_errors_with_same_id_when_comparing_then_they_should_be_equal() {
+    fn test_03_given_two_not_found_by_id_errors_with_same_id_when_comparing_then_they_should_be_equal()
+     {
         // GIVEN
         let id = ClientId::default();
-        let err1 = ClientError::NotFoundById { id_document: id.clone() };
-        let err2 = ClientError::NotFoundById { id_document: id.clone() };
+        let err1 = ClientError::NotFoundById {
+            id_document: id.clone(),
+        };
+        let err2 = ClientError::NotFoundById {
+            id_document: id.clone(),
+        };
         // THEN
         assert_eq!(err1, err2);
     }
 
     #[test]
-    fn test_04_given_two_not_found_by_id_errors_with_different_id_when_comparing_then_they_should_not_be_equal() {
+    fn test_04_given_two_not_found_by_id_errors_with_different_id_when_comparing_then_they_should_not_be_equal()
+     {
         // GIVEN
-        let err1 = ClientError::NotFoundById { id_document: ClientId::default() };
-        let err2 = ClientError::NotFoundById { id_document: ClientId::default() };
+        let err1 = ClientError::NotFoundById {
+            id_document: ClientId::default(),
+        };
+        let err2 = ClientError::NotFoundById {
+            id_document: ClientId::default(),
+        };
         // THEN
         assert_ne!(err1, err2);
     }
 
     #[test]
-    fn test_05_given_two_field_empty_errors_with_same_field_when_comparing_then_they_should_be_equal() {
+    fn test_05_given_two_field_empty_errors_with_same_field_when_comparing_then_they_should_be_equal()
+     {
         // GIVEN
-        let err1 = ClientError::FieldEmpty { field_name: "foo".to_string() };
-        let err2 = ClientError::FieldEmpty { field_name: "foo".to_string() };
+        let err1 = ClientError::FieldEmpty {
+            field_name: "foo".to_string(),
+        };
+        let err2 = ClientError::FieldEmpty {
+            field_name: "foo".to_string(),
+        };
         // THEN
         assert_eq!(err1, err2);
     }
 
     #[test]
-    fn test_06_given_two_field_empty_errors_with_different_field_when_comparing_then_they_should_not_be_equal() {
+    fn test_06_given_two_field_empty_errors_with_different_field_when_comparing_then_they_should_not_be_equal()
+     {
         // GIVEN
-        let err1 = ClientError::FieldEmpty { field_name: "foo".to_string() };
-        let err2 = ClientError::FieldEmpty { field_name: "bar".to_string() };
+        let err1 = ClientError::FieldEmpty {
+            field_name: "foo".to_string(),
+        };
+        let err2 = ClientError::FieldEmpty {
+            field_name: "bar".to_string(),
+        };
         // THEN
         assert_ne!(err1, err2);
     }
@@ -185,19 +215,41 @@ mod tests {
         assert_eq!(ClientError::PositiveAmount, ClientError::PositiveAmount);
         assert_eq!(ClientError::ZeroAmount, ClientError::ZeroAmount);
         assert_eq!(ClientError::BalancesEmpty, ClientError::BalancesEmpty);
-        assert_eq!(ClientError::Unknown(anyhow!("err1")), ClientError::Unknown(anyhow!("err2")));
+        assert_eq!(
+            ClientError::Unknown(anyhow!("err1")),
+            ClientError::Unknown(anyhow!("err2"))
+        );
         assert_ne!(ClientError::NegativeAmount, ClientError::PositiveAmount);
     }
 
     #[test]
-    fn test_08_given_field_invalid_and_field_max_length_when_comparing_then_they_should_be_equal_or_not() {
+    fn test_08_given_field_invalid_and_field_max_length_when_comparing_then_they_should_be_equal_or_not()
+     {
         // GIVEN
-        let err1 = ClientError::FieldInvalid { field_name: "foo".to_string(), value: "a".to_string() };
-        let err2 = ClientError::FieldInvalid { field_name: "foo".to_string(), value: "a".to_string() };
-        let err3 = ClientError::FieldInvalid { field_name: "foo".to_string(), value: "b".to_string() };
-        let err4 = ClientError::FieldMaxLength { field_name: "foo".to_string(), max_length: 5 };
-        let err5 = ClientError::FieldMaxLength { field_name: "foo".to_string(), max_length: 5 };
-        let err6 = ClientError::FieldMaxLength { field_name: "foo".to_string(), max_length: 6 };
+        let err1 = ClientError::FieldInvalid {
+            field_name: "foo".to_string(),
+            value: "a".to_string(),
+        };
+        let err2 = ClientError::FieldInvalid {
+            field_name: "foo".to_string(),
+            value: "a".to_string(),
+        };
+        let err3 = ClientError::FieldInvalid {
+            field_name: "foo".to_string(),
+            value: "b".to_string(),
+        };
+        let err4 = ClientError::FieldMaxLength {
+            field_name: "foo".to_string(),
+            max_length: 5,
+        };
+        let err5 = ClientError::FieldMaxLength {
+            field_name: "foo".to_string(),
+            max_length: 5,
+        };
+        let err6 = ClientError::FieldMaxLength {
+            field_name: "foo".to_string(),
+            max_length: 6,
+        };
         // THEN
         assert_eq!(err1, err2);
         assert_ne!(err1, err3);
@@ -212,17 +264,64 @@ mod tests {
         let id = ClientId::default();
         let d = Document::new("A").unwrap();
         // THEN
-        assert_eq!(ClientError::Duplicate { document: doc.clone() }.code(), "CLIENT_DUPLICATE");
-        assert_eq!(ClientError::NotFoundById { id_document: id.clone() }.code(), "CLIENT_NOT_FOUND_BY_ID");
-        assert_eq!(ClientError::NotFoundByDocument { document: d.clone() }.code(), "CLIENT_NOT_FOUND_BY_DOCUMENT");
-        assert_eq!(ClientError::FieldEmpty { field_name: "foo".to_string() }.code(), "CLIENT_FOO_EMPTY");
-        assert_eq!(ClientError::FieldInvalid { field_name: "foo".to_string(), value: "bar".to_string() }.code(), "CLIENT_FOO_INVALID");
-        assert_eq!(ClientError::FieldMaxLength { field_name: "foo".to_string(), max_length: 5 }.code(), "CLIENT_FOO_MAX_LENGTH");
-        assert_eq!(ClientError::NegativeAmount.code(), "CLIENT_NEGATIVE_BALANCE");
-        assert_eq!(ClientError::PositiveAmount.code(), "CLIENT_POSITIVE_BALANCE");
+        assert_eq!(
+            ClientError::Duplicate {
+                document: doc.clone()
+            }
+            .code(),
+            "CLIENT_DUPLICATE"
+        );
+        assert_eq!(
+            ClientError::NotFoundById {
+                id_document: id.clone()
+            }
+            .code(),
+            "CLIENT_NOT_FOUND_BY_ID"
+        );
+        assert_eq!(
+            ClientError::NotFoundByDocument {
+                document: d.clone()
+            }
+            .code(),
+            "CLIENT_NOT_FOUND_BY_DOCUMENT"
+        );
+        assert_eq!(
+            ClientError::FieldEmpty {
+                field_name: "foo".to_string()
+            }
+            .code(),
+            "CLIENT_FOO_EMPTY"
+        );
+        assert_eq!(
+            ClientError::FieldInvalid {
+                field_name: "foo".to_string(),
+                value: "bar".to_string()
+            }
+            .code(),
+            "CLIENT_FOO_INVALID"
+        );
+        assert_eq!(
+            ClientError::FieldMaxLength {
+                field_name: "foo".to_string(),
+                max_length: 5
+            }
+            .code(),
+            "CLIENT_FOO_MAX_LENGTH"
+        );
+        assert_eq!(
+            ClientError::NegativeAmount.code(),
+            "CLIENT_NEGATIVE_BALANCE"
+        );
+        assert_eq!(
+            ClientError::PositiveAmount.code(),
+            "CLIENT_POSITIVE_BALANCE"
+        );
         assert_eq!(ClientError::ZeroAmount.code(), "CLIENT_ZERO_BALANCE");
         assert_eq!(ClientError::BalancesEmpty.code(), "CLIENT_BALANCES_EMPTY");
-        assert_eq!(ClientError::Unknown(anyhow!("err")).code(), "CLIENT_UNKNOWN_ERROR");
+        assert_eq!(
+            ClientError::Unknown(anyhow!("err")).code(),
+            "CLIENT_UNKNOWN_ERROR"
+        );
     }
 
     #[test]
@@ -232,16 +331,78 @@ mod tests {
         let id = ClientId::default();
         let d = Document::new("A").unwrap();
         // THEN
-        assert_eq!(format!("{}", ClientError::Duplicate { document: doc.clone() }), format!("client with document {} already exists", doc));
-        assert_eq!(format!("{}", ClientError::NotFoundById { id_document: id.clone() }), format!("client not found by id {}", id));
-        assert_eq!(format!("{}", ClientError::NotFoundByDocument { document: d.clone() }), format!("client not found by document {}", d));
-        assert_eq!(format!("{}", ClientError::FieldEmpty { field_name: "foo".to_string() }), "client foo cannot be empty");
-        assert_eq!(format!("{}", ClientError::FieldInvalid { field_name: "foo".to_string(), value: "bar".to_string() }), "client foo is invalid: bar");
-        assert_eq!(format!("{}", ClientError::FieldMaxLength { field_name: "foo".to_string(), max_length: 5 }), "client foo is too long. Max length is 5");
-        assert_eq!(format!("{}", ClientError::NegativeAmount), "client amount cannot be negative");
-        assert_eq!(format!("{}", ClientError::PositiveAmount), "client amount cannot be positive");
-        assert_eq!(format!("{}", ClientError::ZeroAmount), "client amount cannot be zero");
-        assert_eq!(format!("{}", ClientError::BalancesEmpty), "balances are empty");
+        assert_eq!(
+            format!(
+                "{}",
+                ClientError::Duplicate {
+                    document: doc.clone()
+                }
+            ),
+            format!("client with document {} already exists", doc)
+        );
+        assert_eq!(
+            format!(
+                "{}",
+                ClientError::NotFoundById {
+                    id_document: id.clone()
+                }
+            ),
+            format!("client not found by id {}", id)
+        );
+        assert_eq!(
+            format!(
+                "{}",
+                ClientError::NotFoundByDocument {
+                    document: d.clone()
+                }
+            ),
+            format!("client not found by document {}", d)
+        );
+        assert_eq!(
+            format!(
+                "{}",
+                ClientError::FieldEmpty {
+                    field_name: "foo".to_string()
+                }
+            ),
+            "client foo cannot be empty"
+        );
+        assert_eq!(
+            format!(
+                "{}",
+                ClientError::FieldInvalid {
+                    field_name: "foo".to_string(),
+                    value: "bar".to_string()
+                }
+            ),
+            "client foo is invalid: bar"
+        );
+        assert_eq!(
+            format!(
+                "{}",
+                ClientError::FieldMaxLength {
+                    field_name: "foo".to_string(),
+                    max_length: 5
+                }
+            ),
+            "client foo is too long. Max length is 5"
+        );
+        assert_eq!(
+            format!("{}", ClientError::NegativeAmount),
+            "client amount cannot be negative"
+        );
+        assert_eq!(
+            format!("{}", ClientError::PositiveAmount),
+            "client amount cannot be positive"
+        );
+        assert_eq!(
+            format!("{}", ClientError::ZeroAmount),
+            "client amount cannot be zero"
+        );
+        assert_eq!(
+            format!("{}", ClientError::BalancesEmpty),
+            "balances are empty"
+        );
         // Unknown error: solo chequear que contiene el string
         let unknown = format!("{}", ClientError::Unknown(anyhow!("err")));
         assert!(unknown.contains("err"));
