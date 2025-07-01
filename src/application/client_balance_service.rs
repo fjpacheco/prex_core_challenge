@@ -64,12 +64,15 @@ where
             .client_repository
             .get_client_by_document(document)
             .await;
-        if result.is_err() {
-            return Ok(());
+        match result {
+            Ok(_) => Err(ClientError::Duplicate {
+                document: document.to_string(),
+            }),
+            Err(e) => match e {
+                ClientError::NotFoundByDocument { .. } => Ok(()),
+                _ => Err(e),
+            },
         }
-        Err(ClientError::Duplicate {
-            document: document.to_string(),
-        })
     }
 }
 
@@ -199,7 +202,7 @@ mod tests {
         )>,
         balance_exporter: Option<MockBalanceExporter>,
     ) -> (MockClientBalanceRepository, MockBalanceExporter) {
-        let balance_exporter = balance_exporter.unwrap_or_default();
+        let mut balance_exporter = balance_exporter.unwrap_or_default();
 
         let (mut client_balance_repository, arc_mutex_clients, arc_mutex_client_balances) =
             client_balance_repository.unwrap_or_default();
@@ -356,6 +359,36 @@ mod tests {
                 }
             });
 
+        let arc_mutex_client_balances_4 = arc_mutex_client_balances.clone();
+        client_balance_repository
+            .expect_reset_all_balances_to_zero()
+            .returning(move || {
+                let mut map = arc_mutex_client_balances_4.lock().unwrap();
+                let mut old_balances = Vec::new();
+                map.iter_mut().for_each(|(_, balance)| {
+                    let old_balance = balance.set_balance(Decimal::ZERO);
+                    old_balances.push(Balance::new(balance.client_id().clone(), old_balance));
+                });
+                Box::pin(async move { Ok(old_balances) })
+            });
+
+        balance_exporter
+            .expect_export_balances()
+            .returning(move |_| Box::pin(async move { Ok(()) }));
+
+        let arc_mutex_client_balances_6 = arc_mutex_client_balances.clone();
+        client_balance_repository
+            .expect_merge_old_balances()
+            .returning(move |old_balances| {
+                let mut map = arc_mutex_client_balances_6.lock().unwrap();
+                old_balances.iter().for_each(|old_balance| {
+                    let actual_balance = map.get_mut(old_balance.client_id()).unwrap();
+                    let new_balance_recorded = actual_balance.balance() + old_balance.balance();
+                    actual_balance.set_balance(new_balance_recorded);
+                });
+                Box::pin(async move { Ok(()) })
+            });
+
         (client_balance_repository, balance_exporter)
     }
 
@@ -482,7 +515,97 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_05_given_a_client_but_not_initialized_client_balance_when_creating_it_then_it_should_return_an_error()
+    async fn test_05_given_error_in_repository_on_create_client_when_creating_client_then_should_return_error()
+     {
+        // SETUP
+        let mut client_balance_repository = MockClientBalanceRepository::default();
+        client_balance_repository
+            .expect_get_client_by_document()
+            .returning(|_| {
+                Box::pin(async {
+                    Err(ClientError::NotFoundByDocument {
+                        document: Document::new("1234567890").unwrap(),
+                    })
+                })
+            });
+        client_balance_repository
+            .expect_create_client()
+            .returning(|_| {
+                Box::pin(async { Err(ClientError::Unknown(anyhow::anyhow!("repo fail"))) })
+            });
+        client_balance_repository
+            .expect_init_client_balance()
+            .returning(|_| {
+                Box::pin(async { Ok(Balance::new(ClientId::default(), Decimal::ZERO)) })
+            });
+        let (client_balance_repository, balance_exporter) = setup_general_mocks(
+            Some((
+                client_balance_repository,
+                Arc::new(Mutex::new(HashMap::new())),
+                Arc::new(Mutex::new(HashMap::new())),
+            )),
+            None,
+        );
+        let client_balance_service = Service::new(client_balance_repository, balance_exporter);
+
+        // GIVEN
+        let req_create = CreateClientRequest::new(
+            ClientName::new("John Doe").unwrap(),
+            BirthDate::new("1990-01-01").unwrap(),
+            Document::new("1234567890").unwrap(),
+            Country::new("US").unwrap(),
+        );
+        // WHEN
+        let result = client_balance_service.create_client(&req_create).await;
+
+        // THEN
+        assert!(result.is_err());
+        assert_eq!(
+            result.err().unwrap(),
+            ClientError::Unknown(anyhow::anyhow!("repo fail"))
+        );
+    }
+
+    #[tokio::test]
+    async fn test_06_given_error_in_repository_on_get_client_by_document_when_creating_client_then_should_return_error()
+     {
+        // SETUP
+        let mut client_balance_repository = MockClientBalanceRepository::default();
+        client_balance_repository
+            .expect_get_client_by_document()
+            .returning(|_| {
+                Box::pin(async { Err(ClientError::Unknown(anyhow::anyhow!("ka boom!"))) })
+            });
+        let (client_balance_repository, balance_exporter) = setup_general_mocks(
+            Some((
+                client_balance_repository,
+                Arc::new(Mutex::new(HashMap::new())),
+                Arc::new(Mutex::new(HashMap::new())),
+            )),
+            None,
+        );
+        let client_balance_service = Service::new(client_balance_repository, balance_exporter);
+
+        // GIVEN
+        let req_create = CreateClientRequest::new(
+            ClientName::new("John Doe").unwrap(),
+            BirthDate::new("1990-01-01").unwrap(),
+            Document::new("1234567890").unwrap(),
+            Country::new("US").unwrap(),
+        );
+        // WHEN
+        let result = client_balance_service.create_client(&req_create).await;
+
+        // THEN
+        assert!(result.is_err());
+        assert_eq!(
+            result.err().unwrap(),
+            ClientError::Unknown(anyhow::anyhow!("ka boom!"))
+        );
+    }
+
+    #[tokio::test]
+    async fn test_07_given_a_client_but_not_initialized_client_balance_when_creating_it_then_it_should_return_an_error()
      {
         // SETUP
         let mut client_balance_repository = MockClientBalanceRepository::default();
@@ -541,7 +664,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_06_given_a_client_created_when_credit_and_debit_balance_then_it_should_be_updated_with_the_new_balance()
+    async fn test_08_given_a_client_created_when_credit_and_debit_balance_then_it_should_be_updated_with_the_new_balance()
      {
         // SETUP
         let (client_balance_repository, balance_exporter) = setup_general_mocks(None, None);
@@ -584,5 +707,732 @@ mod tests {
         assert_eq!(result_transaction_2.client_id(), client_id);
         assert_eq!(result_get.balance(), &Decimal::from(67));
         assert_eq!(result_get.client_id(), client_id);
+    }
+
+    #[tokio::test]
+    async fn test_09_given_nonexistent_client_when_credit_balance_then_should_return_not_found() {
+        // SETUP
+        let (client_balance_repository, balance_exporter) = setup_general_mocks(None, None);
+        let client_balance_service = Service::new(client_balance_repository, balance_exporter);
+
+        // GIVEN
+        let client_id = ClientId::default();
+        let req = CreditTransactionRequest::new(client_id.clone(), Decimal::from(100)).unwrap();
+
+        // WHEN
+        let result = client_balance_service.credit_balance(&req).await;
+
+        // ASSERT
+        assert!(result.is_err());
+        assert_eq!(
+            result.err().unwrap(),
+            ClientError::NotFoundById {
+                id_document: client_id.clone()
+            }
+        );
+    }
+
+    #[tokio::test]
+    async fn test_10_given_error_in_repository_when_credit_balance_then_should_return_error() {
+        // SETUP
+        let mut client_balance_repository = MockClientBalanceRepository::default();
+        client_balance_repository
+            .expect_client_id_exists()
+            .returning(|_| Box::pin(async { Ok(true) }));
+        client_balance_repository
+            .expect_credit_balance()
+            .returning(|_| {
+                Box::pin(async { Err(ClientError::Unknown(anyhow::anyhow!("ka boom!"))) })
+            });
+        let (client_balance_repository, balance_exporter) = setup_general_mocks(
+            Some((
+                client_balance_repository,
+                Arc::new(Mutex::new(HashMap::new())),
+                Arc::new(Mutex::new(HashMap::new())),
+            )),
+            None,
+        );
+        let client_balance_service = Service::new(client_balance_repository, balance_exporter);
+
+        // GIVEN
+        let client_id = ClientId::default();
+        let req = CreditTransactionRequest::new(client_id.clone(), Decimal::from(100)).unwrap();
+
+        // WHEN
+        let result = client_balance_service.credit_balance(&req).await;
+
+        // ASSERT
+        assert!(result.is_err());
+        assert_eq!(
+            result.err().unwrap(),
+            ClientError::Unknown(anyhow::anyhow!("ka boom!"))
+        );
+    }
+
+    #[tokio::test]
+    async fn test_11_given_nonexistent_client_when_debit_balance_then_should_return_not_found() {
+        // SETUP
+        let (client_balance_repository, balance_exporter) = setup_general_mocks(None, None);
+        let client_balance_service = Service::new(client_balance_repository, balance_exporter);
+
+        // GIVEN
+        let client_id = ClientId::default();
+        let req = DebitTransactionRequest::new(client_id.clone(), Decimal::from(-100)).unwrap();
+
+        // WHEN
+        let result = client_balance_service.debit_balance(&req).await;
+
+        // ASSERT
+        assert!(result.is_err());
+        assert_eq!(
+            result.err().unwrap(),
+            ClientError::NotFoundById {
+                id_document: client_id.clone()
+            }
+        );
+    }
+
+    #[tokio::test]
+    async fn test_12_given_error_in_repository_when_debit_balance_then_should_return_error() {
+        // SETUP
+        let mut client_balance_repository = MockClientBalanceRepository::default();
+        client_balance_repository
+            .expect_client_id_exists()
+            .returning(|_| Box::pin(async { Ok(true) }));
+        client_balance_repository
+            .expect_debit_balance()
+            .returning(|_| {
+                Box::pin(async { Err(ClientError::Unknown(anyhow::anyhow!("ka boom!"))) })
+            });
+        let (client_balance_repository, balance_exporter) = setup_general_mocks(
+            Some((
+                client_balance_repository,
+                Arc::new(Mutex::new(HashMap::new())),
+                Arc::new(Mutex::new(HashMap::new())),
+            )),
+            None,
+        );
+        let client_balance_service = Service::new(client_balance_repository, balance_exporter);
+
+        // GIVEN
+        let client_id = ClientId::default();
+        let req = DebitTransactionRequest::new(client_id.clone(), Decimal::from(-100)).unwrap();
+
+        // WHEN
+        let result = client_balance_service.debit_balance(&req).await;
+
+        // ASSERT
+        assert!(result.is_err());
+        assert_eq!(
+            result.err().unwrap(),
+            ClientError::Unknown(anyhow::anyhow!("ka boom!"))
+        );
+    }
+
+    #[tokio::test]
+    async fn test_13_given_nonexistent_client_when_get_balance_then_should_return_not_found() {
+        // SETUP
+        let (client_balance_repository, balance_exporter) = setup_general_mocks(None, None);
+        let client_balance_service = Service::new(client_balance_repository, balance_exporter);
+
+        // GIVEN
+        let client_id = ClientId::default();
+        let req = GetClientRequest::new(client_id.clone());
+
+        // WHEN
+        let result = client_balance_service.get_balance_by_client_id(&req).await;
+
+        // ASSERT
+        assert!(result.is_err());
+        assert_eq!(
+            result.err().unwrap(),
+            ClientError::NotFoundById {
+                id_document: client_id.clone()
+            }
+        );
+    }
+
+    #[tokio::test]
+    async fn test_14_given_error_in_repository_when_get_balance_then_should_return_error() {
+        // SETUP
+        let mut client_balance_repository = MockClientBalanceRepository::default();
+        client_balance_repository
+            .expect_client_id_exists()
+            .returning(|_| Box::pin(async { Ok(true) }));
+        client_balance_repository
+            .expect_get_balance_by_client_id()
+            .returning(|_| {
+                Box::pin(async { Err(ClientError::Unknown(anyhow::anyhow!("ka boom!"))) })
+            });
+        let (client_balance_repository, balance_exporter) = setup_general_mocks(
+            Some((
+                client_balance_repository,
+                Arc::new(Mutex::new(HashMap::new())),
+                Arc::new(Mutex::new(HashMap::new())),
+            )),
+            None,
+        );
+        let client_balance_service = Service::new(client_balance_repository, balance_exporter);
+
+        // GIVEN
+        let client_id = ClientId::default();
+        let req = GetClientRequest::new(client_id.clone());
+
+        // WHEN
+        let result = client_balance_service.get_balance_by_client_id(&req).await;
+
+        // ASSERT
+        assert!(result.is_err());
+        assert_eq!(
+            result.err().unwrap(),
+            ClientError::Unknown(anyhow::anyhow!("ka boom!"))
+        );
+    }
+
+    #[tokio::test]
+    async fn test_15_given_nonexistent_client_when_get_client_then_should_return_not_found() {
+        // SETUP
+        let (client_balance_repository, balance_exporter) = setup_general_mocks(None, None);
+        let client_balance_service = Service::new(client_balance_repository, balance_exporter);
+
+        // GIVEN
+        let client_id = ClientId::default();
+        let req = GetClientRequest::new(client_id.clone());
+
+        // WHEN
+        let result = client_balance_service.get_client_by_id(&req).await;
+
+        // ASSERT
+        assert!(result.is_err());
+        assert_eq!(
+            result.err().unwrap(),
+            ClientError::NotFoundById {
+                id_document: client_id.clone()
+            }
+        );
+    }
+
+    #[tokio::test]
+    async fn test_16_given_error_in_repository_when_get_client_then_should_return_error() {
+        // SETUP
+        let mut client_balance_repository = MockClientBalanceRepository::default();
+        client_balance_repository
+            .expect_client_id_exists()
+            .returning(|_| Box::pin(async { Ok(true) }));
+        client_balance_repository
+            .expect_get_client()
+            .returning(|_| {
+                Box::pin(async { Err(ClientError::Unknown(anyhow::anyhow!("kaaa boomo!!"))) })
+            });
+        let (client_balance_repository, balance_exporter) = setup_general_mocks(
+            Some((
+                client_balance_repository,
+                Arc::new(Mutex::new(HashMap::new())),
+                Arc::new(Mutex::new(HashMap::new())),
+            )),
+            None,
+        );
+        let client_balance_service = Service::new(client_balance_repository, balance_exporter);
+
+        // GIVEN
+        let client_id = ClientId::default();
+        let req = GetClientRequest::new(client_id.clone());
+
+        // WHEN
+        let result = client_balance_service.get_client_by_id(&req).await;
+
+        // ASSERT
+        assert!(result.is_err());
+        assert_eq!(
+            result.err().unwrap(),
+            ClientError::Unknown(anyhow::anyhow!("kaaa boomo!!"))
+        );
+    }
+
+    #[tokio::test]
+    async fn test_17_given_one_client_when_store_balances_then_balances_are_zero_and_exported() {
+        // SETUP
+        let (client_balance_repository, balance_exporter) = setup_general_mocks(None, None);
+        let client_balance_service = Service::new(client_balance_repository, balance_exporter);
+
+        // GIVEN
+        let req_create = CreateClientRequest::new(
+            ClientName::new("John Doe").unwrap(),
+            BirthDate::new("1990-01-01").unwrap(),
+            Document::new("1234567890").unwrap(),
+            Country::new("US").unwrap(),
+        );
+        let client = client_balance_service
+            .create_client(&req_create)
+            .await
+            .unwrap();
+        let client_id = client.id().clone();
+        let req_credit =
+            CreditTransactionRequest::new(client_id.clone(), Decimal::from(100)).unwrap();
+        client_balance_service
+            .credit_balance(&req_credit)
+            .await
+            .unwrap();
+        let req_get = GetClientRequest::new(client_id.clone());
+
+        // WHEN
+        let result_store = client_balance_service.store_balances().await;
+        let result_get = client_balance_service
+            .get_balance_by_client_id(&req_get)
+            .await
+            .unwrap();
+
+        // ASSERT
+        assert!(result_store.is_ok());
+        assert_eq!(result_get.balance(), &Decimal::ZERO);
+    }
+
+    #[tokio::test]
+    async fn test_18_given_multiple_clients_when_store_balances_then_all_balances_are_zero_and_exported()
+     {
+        // SETUP
+        let (client_balance_repository, balance_exporter) = setup_general_mocks(None, None);
+        let client_balance_service = Service::new(client_balance_repository, balance_exporter);
+
+        // GIVEN: crear dos clientes usando el servicio
+        let req_create_1 = CreateClientRequest::new(
+            ClientName::new("John Doe").unwrap(),
+            BirthDate::new("1990-01-01").unwrap(),
+            Document::new("1234567890").unwrap(),
+            Country::new("US").unwrap(),
+        );
+        let req_create_2 = CreateClientRequest::new(
+            ClientName::new("Jane Roe").unwrap(),
+            BirthDate::new("1992-02-02").unwrap(),
+            Document::new("9876543210").unwrap(),
+            Country::new("AR").unwrap(),
+        );
+        let client_1 = client_balance_service
+            .create_client(&req_create_1)
+            .await
+            .unwrap();
+        let client_2 = client_balance_service
+            .create_client(&req_create_2)
+            .await
+            .unwrap();
+        let client_id1 = client_1.id().clone();
+        let client_id2 = client_2.id().clone();
+        let req_credit =
+            CreditTransactionRequest::new(client_id1.clone(), Decimal::from(100)).unwrap();
+        let req_debit =
+            DebitTransactionRequest::new(client_id2.clone(), Decimal::from(-50)).unwrap();
+        client_balance_service
+            .credit_balance(&req_credit)
+            .await
+            .unwrap();
+        client_balance_service
+            .debit_balance(&req_debit)
+            .await
+            .unwrap();
+
+        // WHEN
+        let result_store = client_balance_service.store_balances().await;
+        let req_get_1 = GetClientRequest::new(client_id1.clone());
+        let req_get_2 = GetClientRequest::new(client_id2.clone());
+        let balance_1 = client_balance_service
+            .get_balance_by_client_id(&req_get_1)
+            .await
+            .unwrap();
+        let balance_2 = client_balance_service
+            .get_balance_by_client_id(&req_get_2)
+            .await
+            .unwrap();
+
+        // ASSERT
+        assert!(result_store.is_ok());
+        assert_eq!(balance_1.balance(), &Decimal::ZERO);
+        assert_eq!(balance_2.balance(), &Decimal::ZERO);
+    }
+
+    #[tokio::test]
+    async fn test_19_given_balances_negative_and_positive_when_store_balances_then_all_zero() {
+        // SETUP
+        let (client_balance_repository, balance_exporter) = setup_general_mocks(None, None);
+        let client_balance_service = Service::new(client_balance_repository, balance_exporter);
+
+        // GIVEN
+        let req_create_1 = CreateClientRequest::new(
+            ClientName::new("John Doe").unwrap(),
+            BirthDate::new("1990-01-01").unwrap(),
+            Document::new("1234567890").unwrap(),
+            Country::new("US").unwrap(),
+        );
+        let req_create_2 = CreateClientRequest::new(
+            ClientName::new("Jane Roe").unwrap(),
+            BirthDate::new("1992-02-02").unwrap(),
+            Document::new("9876543210").unwrap(),
+            Country::new("AR").unwrap(),
+        );
+        let req_create_3 = CreateClientRequest::new(
+            ClientName::new("Foo Bar").unwrap(),
+            BirthDate::new("1980-03-03").unwrap(),
+            Document::new("5555555555").unwrap(),
+            Country::new("BR").unwrap(),
+        );
+        let client_1 = client_balance_service
+            .create_client(&req_create_1)
+            .await
+            .unwrap();
+        let client_2 = client_balance_service
+            .create_client(&req_create_2)
+            .await
+            .unwrap();
+        let client_3 = client_balance_service
+            .create_client(&req_create_3)
+            .await
+            .unwrap();
+        let client_id1 = client_1.id().clone();
+        let client_id2 = client_2.id().clone();
+        let client_id3 = client_3.id().clone();
+        let req_credit =
+            CreditTransactionRequest::new(client_id1.clone(), Decimal::from(100)).unwrap();
+        let req_debit =
+            DebitTransactionRequest::new(client_id2.clone(), Decimal::from(-50)).unwrap();
+        let req_credit_3 =
+            CreditTransactionRequest::new(client_id3.clone(), Decimal::from(200)).unwrap();
+        client_balance_service
+            .credit_balance(&req_credit)
+            .await
+            .unwrap();
+        client_balance_service
+            .debit_balance(&req_debit)
+            .await
+            .unwrap();
+        client_balance_service
+            .credit_balance(&req_credit_3)
+            .await
+            .unwrap();
+
+        // WHEN
+        let result_store = client_balance_service.store_balances().await;
+        let req_get_1 = GetClientRequest::new(client_id1.clone());
+        let req_get_2 = GetClientRequest::new(client_id2.clone());
+        let req_get_3 = GetClientRequest::new(client_id3.clone());
+        let balance_1 = client_balance_service
+            .get_balance_by_client_id(&req_get_1)
+            .await
+            .unwrap();
+        let balance_2 = client_balance_service
+            .get_balance_by_client_id(&req_get_2)
+            .await
+            .unwrap();
+        let balance_3 = client_balance_service
+            .get_balance_by_client_id(&req_get_3)
+            .await
+            .unwrap();
+
+        // ASSERT
+        assert!(result_store.is_ok());
+        assert_eq!(balance_1.balance(), &Decimal::ZERO);
+        assert_eq!(balance_2.balance(), &Decimal::ZERO);
+        assert_eq!(balance_3.balance(), &Decimal::ZERO);
+    }
+
+    #[tokio::test]
+    async fn test_20_given_balances_already_zero_when_store_balances_then_exporter_receives_zero() {
+        // SETUP
+        let (client_balance_repository, balance_exporter) = setup_general_mocks(None, None);
+        let client_balance_service = Service::new(client_balance_repository, balance_exporter);
+
+        // GIVEN
+        let req_create = CreateClientRequest::new(
+            ClientName::new("John Doe").unwrap(),
+            BirthDate::new("1990-01-01").unwrap(),
+            Document::new("1234567890").unwrap(),
+            Country::new("US").unwrap(),
+        );
+        let client = client_balance_service
+            .create_client(&req_create)
+            .await
+            .unwrap();
+        let client_id = client.id().clone();
+
+        // WHEN
+        let result_store = client_balance_service.store_balances().await;
+        let req_get = GetClientRequest::new(client_id.clone());
+        let balance = client_balance_service
+            .get_balance_by_client_id(&req_get)
+            .await
+            .unwrap();
+
+        // ASSERT
+        assert!(result_store.is_ok());
+        assert_eq!(balance.balance(), &Decimal::ZERO);
+    }
+
+    #[tokio::test]
+    async fn test_21_given_no_balances_when_store_balances_then_should_return_balances_empty() {
+        // SETUP
+        let mut client_balance_repository = MockClientBalanceRepository::default();
+        client_balance_repository
+            .expect_are_balances_empty()
+            .returning(|| Box::pin(async { Ok(true) }));
+        let (client_balance_repository, balance_exporter) = setup_general_mocks(
+            Some((
+                client_balance_repository,
+                Arc::new(Mutex::new(HashMap::new())),
+                Arc::new(Mutex::new(HashMap::new())),
+            )),
+            None,
+        );
+        let client_balance_service = Service::new(client_balance_repository, balance_exporter);
+
+        // WHEN
+        let result = client_balance_service.store_balances().await;
+
+        // ASSERT
+        assert!(result.is_err());
+        assert_eq!(result.err().unwrap(), ClientError::BalancesEmpty);
+    }
+
+    #[tokio::test]
+    async fn test_22_given_error_on_reset_all_balances_to_zero_when_store_balances_then_return_error_and_balances_remain_unchanged()
+     {
+        // SETUP
+        let mut client_balance_repository = MockClientBalanceRepository::default();
+        client_balance_repository
+            .expect_reset_all_balances_to_zero()
+            .returning(|| {
+                Box::pin(async { Err(ClientError::Unknown(anyhow::anyhow!("ka boom!"))) })
+            });
+        let (client_balance_repository, balance_exporter) = setup_general_mocks(
+            Some((
+                client_balance_repository,
+                Arc::new(Mutex::new(HashMap::new())),
+                Arc::new(Mutex::new(HashMap::new())),
+            )),
+            None,
+        );
+        let client_balance_service = Service::new(client_balance_repository, balance_exporter);
+
+        // GIVEN
+        let req_create_1 = CreateClientRequest::new(
+            ClientName::new("John Doe").unwrap(),
+            BirthDate::new("1990-01-01").unwrap(),
+            Document::new("1234567890").unwrap(),
+            Country::new("US").unwrap(),
+        );
+        let req_create_2 = CreateClientRequest::new(
+            ClientName::new("Jane Roe").unwrap(),
+            BirthDate::new("1992-02-02").unwrap(),
+            Document::new("9876543210").unwrap(),
+            Country::new("AR").unwrap(),
+        );
+        let client_1 = client_balance_service
+            .create_client(&req_create_1)
+            .await
+            .unwrap();
+        let client_2 = client_balance_service
+            .create_client(&req_create_2)
+            .await
+            .unwrap();
+        let client_id1 = client_1.id().clone();
+        let client_id2 = client_2.id().clone();
+        let decimal_1_expected = Decimal::from(100);
+        let decimal_2_expected = Decimal::from(-50);
+        let req_credit =
+            CreditTransactionRequest::new(client_id1.clone(), decimal_1_expected).unwrap();
+        let req_debit =
+            DebitTransactionRequest::new(client_id2.clone(), decimal_2_expected).unwrap();
+        client_balance_service
+            .credit_balance(&req_credit)
+            .await
+            .unwrap();
+        client_balance_service
+            .debit_balance(&req_debit)
+            .await
+            .unwrap();
+        let req_get_1 = GetClientRequest::new(client_id1.clone());
+        let req_get_2 = GetClientRequest::new(client_id2.clone());
+
+        // WHEN
+        let result_store = client_balance_service.store_balances().await;
+        let result_balance_1 = client_balance_service
+            .get_balance_by_client_id(&req_get_1)
+            .await;
+        let result_balance_2 = client_balance_service
+            .get_balance_by_client_id(&req_get_2)
+            .await;
+
+        // THEN
+        assert!(result_store.is_err());
+        assert_eq!(
+            result_store.err().unwrap(),
+            ClientError::Unknown(anyhow::anyhow!("ka boom!"))
+        );
+        assert!(result_balance_1.is_ok());
+        assert!(result_balance_2.is_ok());
+        let balance_1 = result_balance_1.unwrap();
+        let balance_2 = result_balance_2.unwrap();
+        assert_eq!(balance_1.balance(), &decimal_1_expected);
+        assert_eq!(balance_2.balance(), &decimal_2_expected);
+    }
+
+    #[tokio::test]
+    async fn test_23_given_error_on_export_balances_when_store_balances_then_return_error_and_balances_remain_unchanged()
+     {
+        // SETUP
+        let mut balance_exporter = MockBalanceExporter::default();
+        balance_exporter.expect_export_balances().returning(|_| {
+            Box::pin(async { Err(ClientError::Unknown(anyhow::anyhow!("ka boom!"))) })
+        });
+        let (client_balance_repository, balance_exporter) =
+            setup_general_mocks(None, Some(balance_exporter));
+        let client_balance_service = Service::new(client_balance_repository, balance_exporter);
+
+        // GIVEN
+        let req_create_1 = CreateClientRequest::new(
+            ClientName::new("John Doe").unwrap(),
+            BirthDate::new("1990-01-01").unwrap(),
+            Document::new("1234567890").unwrap(),
+            Country::new("US").unwrap(),
+        );
+        let req_create_2 = CreateClientRequest::new(
+            ClientName::new("Jane Roe").unwrap(),
+            BirthDate::new("1992-02-02").unwrap(),
+            Document::new("9876543210").unwrap(),
+            Country::new("AR").unwrap(),
+        );
+        let client_1 = client_balance_service
+            .create_client(&req_create_1)
+            .await
+            .unwrap();
+        let client_2 = client_balance_service
+            .create_client(&req_create_2)
+            .await
+            .unwrap();
+        let client_id1 = client_1.id().clone();
+        let client_id2 = client_2.id().clone();
+        let decimal_1_expected = Decimal::from(100);
+        let decimal_2_expected = Decimal::from(-50);
+        let req_credit =
+            CreditTransactionRequest::new(client_id1.clone(), Decimal::from(100)).unwrap();
+        let req_debit =
+            DebitTransactionRequest::new(client_id2.clone(), Decimal::from(-50)).unwrap();
+        client_balance_service
+            .credit_balance(&req_credit)
+            .await
+            .unwrap();
+        client_balance_service
+            .debit_balance(&req_debit)
+            .await
+            .unwrap();
+        let req_get_1 = GetClientRequest::new(client_id1.clone());
+        let req_get_2 = GetClientRequest::new(client_id2.clone());
+
+        // WHEN
+        let result_store = client_balance_service.store_balances().await;
+        let result_balance_1 = client_balance_service
+            .get_balance_by_client_id(&req_get_1)
+            .await;
+        let result_balance_2 = client_balance_service
+            .get_balance_by_client_id(&req_get_2)
+            .await;
+
+        // THEN
+        assert!(result_store.is_err());
+        assert_eq!(
+            result_store.err().unwrap(),
+            ClientError::Unknown(anyhow::anyhow!("ka boom!"))
+        );
+        assert!(result_balance_1.is_ok());
+        assert!(result_balance_2.is_ok());
+        let balance_1 = result_balance_1.unwrap();
+        let balance_2 = result_balance_2.unwrap();
+        assert_eq!(balance_1.balance(), &decimal_1_expected);
+        assert_eq!(balance_2.balance(), &decimal_2_expected);
+    }
+
+    #[tokio::test]
+    async fn test_24_given_error_on_export_balances_and_merge_old_balances_when_store_balances_then_return_error_and_old_balances_are_lost()
+     {
+        // SETUP
+        let mut client_balance_repository = MockClientBalanceRepository::default();
+        let mut balance_exporter = MockBalanceExporter::default();
+        balance_exporter.expect_export_balances().returning(|_| {
+            Box::pin(async { Err(ClientError::Unknown(anyhow::anyhow!("ka boom!"))) })
+        });
+        client_balance_repository
+            .expect_merge_old_balances()
+            .returning(|_| {
+                Box::pin(async { Err(ClientError::Unknown(anyhow::anyhow!("ka boom!"))) })
+            });
+
+        let (client_balance_repository, balance_exporter) = setup_general_mocks(
+            Some((
+                client_balance_repository,
+                Arc::new(Mutex::new(HashMap::new())),
+                Arc::new(Mutex::new(HashMap::new())),
+            )),
+            Some(balance_exporter),
+        );
+        let client_balance_service = Service::new(client_balance_repository, balance_exporter);
+
+        // GIVEN
+        let req_create_1 = CreateClientRequest::new(
+            ClientName::new("John Doe").unwrap(),
+            BirthDate::new("1990-01-01").unwrap(),
+            Document::new("1234567890").unwrap(),
+            Country::new("US").unwrap(),
+        );
+        let req_create_2 = CreateClientRequest::new(
+            ClientName::new("Jane Roe").unwrap(),
+            BirthDate::new("1992-02-02").unwrap(),
+            Document::new("9876543210").unwrap(),
+            Country::new("AR").unwrap(),
+        );
+        let client_1 = client_balance_service
+            .create_client(&req_create_1)
+            .await
+            .unwrap();
+        let client_2 = client_balance_service
+            .create_client(&req_create_2)
+            .await
+            .unwrap();
+        let client_id1 = client_1.id().clone();
+        let client_id2 = client_2.id().clone();
+        let decimal_1_expected = Decimal::from(100);
+        let decimal_2_expected = Decimal::from(-50);
+        let req_credit =
+            CreditTransactionRequest::new(client_id1.clone(), decimal_1_expected).unwrap();
+        let req_debit =
+            DebitTransactionRequest::new(client_id2.clone(), decimal_2_expected).unwrap();
+        client_balance_service
+            .credit_balance(&req_credit)
+            .await
+            .unwrap();
+        client_balance_service
+            .debit_balance(&req_debit)
+            .await
+            .unwrap();
+        let req_get_1 = GetClientRequest::new(client_id1.clone());
+        let req_get_2 = GetClientRequest::new(client_id2.clone());
+
+        // WHEN
+        let result_store = client_balance_service.store_balances().await;
+        let result_balance_1 = client_balance_service
+            .get_balance_by_client_id(&req_get_1)
+            .await;
+        let result_balance_2 = client_balance_service
+            .get_balance_by_client_id(&req_get_2)
+            .await;
+
+        // THEN
+        assert!(result_store.is_err());
+        assert_eq!(
+            result_store.err().unwrap(),
+            ClientError::Unknown(anyhow::anyhow!("ka boom!"))
+        );
+        assert!(result_balance_1.is_ok());
+        assert!(result_balance_2.is_ok());
+        let balance_1 = result_balance_1.unwrap();
+        let balance_2 = result_balance_2.unwrap();
+        assert_eq!(balance_1.balance(), &Decimal::ZERO);
+        assert_eq!(balance_2.balance(), &Decimal::ZERO);
     }
 }
