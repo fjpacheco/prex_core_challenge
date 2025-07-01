@@ -176,7 +176,7 @@ En la capa de **Infrastructure** se decidió no agregar tests, ya que solo inter
 
 Tal como se enuncian en los requerimientos, los datos de clientes y sus balances se persisten en memoria.
 
-Pero dada la arquitectura definida, no sería complejo agregar capa de persistencia en una base de datos como PostgreSQL/MySQL/MongoDB/etc. Esto se vio reflejado en el adapter de persistencia en memoria, donde en [in_memory.rs](src/infrastructure/outbound/in_memory.rs) se puede ver cómo se implementa la persistencia en memoria con un simple HashMap, pero que en los tests unitarios se puede ver cómo se implementa el adaptar mediante mocks, pero que también termina siendo en memoria con dos HashMap diferentes.
+Pero dada la arquitectura definida, no sería complejo agregar una capa de persistencia con una base de datos como PostgreSQL/MySQL/MongoDB/etc. Esto se vio reflejado en el adapter de persistencia en memoria, donde en [in_memory.rs](src/infrastructure/outbound/in_memory.rs) se puede ver cómo se implementa la persistencia en memoria con un simple HashMap, pero que en los tests unitarios se puede ver cómo se implementa el adaptar mediante mocks, pero que también termina siendo en memoria con dos HashMap diferentes.
 
 #### Uso sincrónico de Mutex
 
@@ -192,7 +192,7 @@ Además que en el adaptador/implementación de persistencia en memoria no se cru
 Si tuviéramos un recurso de I/O, como una base de datos, ahí sí conviene usar el Mutex asincrónico para proveer el acceso mutable compartido a esa conexión o pool de conexiones a la base de datos.
 
 > [!TIP]
-> Citando a [Alice Ryhl](https://www.linkedin.com/in/aliceryhl/), Maintener de Tokio: "_You should only use an asynchronous lock if you need to .await something while the lock is locked. Usually, this is not necessary, and you should avoid using an asynchronous lock when you can. Asynchronous locks are a lot slower than blocking locks._"
+> Citando a [Alice Ryhl](https://www.linkedin.com/in/aliceryhl/), Maintainer de Tokio: "_You should only use an asynchronous lock if you need to .await something while the lock is locked. Usually, this is not necessary, and you should avoid using an asynchronous lock when you can. Asynchronous locks are a lot slower than blocking locks._"
 >
 > https://draft.ryhl.io/blog/shared-mutable-state/
 
