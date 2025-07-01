@@ -23,8 +23,7 @@ use crate::domain::{
 };
 
 pub struct InMemoryRepository {
-    clients: Arc<Mutex<HashMap<ClientId, Client>>>,
-    client_balances: Arc<Mutex<HashMap<ClientId, Balance>>>,
+    clients: Arc<Mutex<HashMap<ClientId, (Client, Decimal)>>>,
     id_counter: AtomicUsize,
 }
 
@@ -38,7 +37,6 @@ impl InMemoryRepository {
     pub fn new() -> Self {
         Self {
             clients: Arc::new(Mutex::new(HashMap::new())),
-            client_balances: Arc::new(Mutex::new(HashMap::new())),
             id_counter: AtomicUsize::new(0),
         }
     }
@@ -48,16 +46,15 @@ impl InMemoryRepository {
         client_id: &ClientId,
         amount: &Decimal,
     ) -> Result<Balance, ClientError> {
-        let mut client_balances = self.client_balances.lock().await;
-        let client_balance =
-            client_balances
-                .get_mut(client_id)
-                .ok_or(ClientError::NotFoundById {
-                    id_document: client_id.clone(),
-                })?;
-        let new_decimal_balance = client_balance.balance() + amount;
-        client_balance.set_balance(new_decimal_balance);
-        Ok(client_balance.clone())
+        let mut clients = self.clients.lock().await;
+        let client_balance = clients
+            .get_mut(client_id)
+            .ok_or(ClientError::NotFoundById {
+                id_document: client_id.clone(),
+            })?;
+        let new_decimal_balance = client_balance.1 + amount;
+        client_balance.1 = new_decimal_balance;
+        Ok(Balance::new(client_id.clone(), new_decimal_balance))
     }
 }
 
@@ -74,32 +71,14 @@ impl ClientBalanceRepository for InMemoryRepository {
         let mut clients = self.clients.lock().await;
         if clients
             .iter()
-            .any(|(_, client)| client.document() == req.document())
+            .any(|(_, (client, _))| client.document() == req.document())
         {
             return Err(ClientError::Duplicate {
                 document: req.document().to_string(),
             });
         }
-        clients.insert(id, client.clone());
+        clients.insert(id, (client.clone(), Decimal::from(0)));
         Ok(client)
-    }
-
-    async fn init_client_balance(&self, req: &ClientId) -> Result<Balance, ClientError> {
-        if !self.client_id_exists(req).await? {
-            return Err(ClientError::NotFoundById {
-                id_document: req.clone(),
-            });
-        }
-        let mut client_balances = self.client_balances.lock().await;
-        let balance = Balance::new(req.clone(), Decimal::from(0));
-        client_balances.insert(req.clone(), balance.clone());
-        Ok(balance)
-    }
-
-    async fn delete_client(&self, client_id: &ClientId) -> Result<(), ClientError> {
-        let mut clients = self.clients.lock().await;
-        clients.remove(client_id);
-        Ok(())
     }
 
     async fn client_id_exists(&self, client_id: &ClientId) -> Result<bool, ClientError> {
@@ -109,13 +88,13 @@ impl ClientBalanceRepository for InMemoryRepository {
 
     async fn get_client_by_document(&self, document: &Document) -> Result<Client, ClientError> {
         let clients = self.clients.lock().await;
-        let client = clients
+        let (_, (client, _)) = clients
             .iter()
-            .find(|(_, client)| client.document() == document)
+            .find(|(_, (client, _))| client.document() == document)
             .ok_or(ClientError::NotFoundByDocument {
                 document: document.clone(),
             })?;
-        Ok(client.1.clone())
+        Ok(client.clone())
     }
 
     async fn credit_balance(&self, req: &CreditTransactionRequest) -> Result<Balance, ClientError> {
@@ -124,7 +103,7 @@ impl ClientBalanceRepository for InMemoryRepository {
 
     async fn get_client(&self, req: &GetClientRequest) -> Result<Client, ClientError> {
         let clients = self.clients.lock().await;
-        let client = clients
+        let (client, _) = clients
             .get(req.client_id())
             .ok_or(ClientError::NotFoundById {
                 id_document: req.client_id().clone(),
@@ -140,45 +119,44 @@ impl ClientBalanceRepository for InMemoryRepository {
         &self,
         req: &GetClientRequest,
     ) -> Result<Balance, ClientError> {
-        let client_balances = self.client_balances.lock().await;
-        let client_balance =
+        let client_balances = self.clients.lock().await;
+        let (client, balance) =
             client_balances
                 .get(req.client_id())
                 .ok_or(ClientError::NotFoundById {
                     id_document: req.client_id().clone(),
                 })?;
-        Ok(client_balance.clone())
+        Ok(Balance::new(client.id().clone(), *balance))
     }
 
     async fn reset_all_balances_to_zero(&self) -> Result<Vec<Balance>, ClientError> {
-        let mut client_balances = self.client_balances.lock().await;
-        let old_balances = client_balances
+        let mut clients = self.clients.lock().await;
+        let old_balances = clients
             .values_mut()
-            .map(|client_balance| {
-                let old_balance = client_balance.set_balance(Decimal::from(0));
-                Balance::new(client_balance.client_id().clone(), old_balance)
+            .map(|(client, balance)| {
+                let old_balance = *balance;
+                *balance = Decimal::from(0);
+                Balance::new(client.id().clone(), old_balance)
             })
             .collect();
         Ok(old_balances)
     }
 
     async fn are_balances_empty(&self) -> Result<bool, ClientError> {
-        let client_balances = self.client_balances.lock().await;
-        Ok(client_balances.is_empty())
+        let clients = self.clients.lock().await;
+        Ok(clients.is_empty())
     }
 
     async fn merge_old_balances(
         &self,
         old_client_balances: Vec<Balance>,
     ) -> Result<(), ClientError> {
-        let mut actual_client_balances = self.client_balances.lock().await;
+        let mut clients = self.clients.lock().await;
         old_client_balances.iter().for_each(|old_client_balance| {
             let old_balance = old_client_balance.balance();
-            if let Some(actual_client_balance) =
-                actual_client_balances.get_mut(old_client_balance.client_id())
-            {
-                let new_balance = *old_balance + *actual_client_balance.balance();
-                actual_client_balance.set_balance(new_balance);
+            if let Some((_, balance)) = clients.get_mut(old_client_balance.client_id()) {
+                let new_balance = *old_balance + *balance;
+                *balance = new_balance;
             } else {
                 tracing::warn!(
                     "client not found by id {} and balance of this client will be ignored...",

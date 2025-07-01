@@ -26,17 +26,6 @@ pub trait ClientBalanceRepository: Send + Sync + 'static {
         req: &CreateClientRequest,
     ) -> impl Future<Output = Result<Client, ClientError>> + Send;
 
-    /// Asynchronously initialize a new [Balance] with a zero balance. Returns the created [Balance].
-    ///
-    /// # Errors
-    ///
-    /// - [ClientError::NotFoundById] if an [Client] with the given [ClientId] does not exist.
-    /// - [ClientError::Unknown] if the [Client] cannot be created.
-    fn init_client_balance(
-        &self,
-        req: &ClientId,
-    ) -> impl Future<Output = Result<Balance, ClientError>> + Send;
-
     /// Asynchronously check if a [ClientId] exists.
     ///
     /// # Errors
@@ -131,15 +120,5 @@ pub trait ClientBalanceRepository: Send + Sync + 'static {
     fn merge_old_balances(
         &self,
         old_balances: Vec<Balance>,
-    ) -> impl Future<Output = Result<(), ClientError>> + Send;
-
-    /// Asynchronously delete a [Client] by [ClientId].
-    ///
-    /// # Errors
-    ///
-    /// - [ClientError::Unknown] if the [Client] cannot be deleted.
-    fn delete_client(
-        &self,
-        client_id: &ClientId,
     ) -> impl Future<Output = Result<(), ClientError>> + Send;
 }

@@ -86,24 +86,6 @@ where
             .await?;
 
         let client = self.client_repository.create_client(req).await?;
-
-        if let Err(e) = self
-            .client_repository
-            .init_client_balance(client.id())
-            .await
-        {
-            tracing::warn!("Error initializing client balance: {:?}", e);
-            tracing::warn!(
-                "Deleting client {:?} because it cannot exist without a balance",
-                client.id()
-            );
-            self.client_repository.delete_client(client.id()).await?;
-            return Err(ClientError::Unknown(anyhow::anyhow!(
-                "Error initializing client: {:?}",
-                e
-            )));
-        }
-
         Ok(client)
     }
 
@@ -229,19 +211,13 @@ mod tests {
                     .lock()
                     .unwrap()
                     .insert(client_id.clone(), client.clone());
+                arc_mutex_client_balances_1.lock().unwrap().insert(
+                    client_id.clone(),
+                    Balance::new(client_id.clone(), Decimal::from(0)),
+                );
                 Box::pin(async move { Ok(client) })
             });
 
-        client_balance_repository
-            .expect_init_client_balance()
-            .returning(move |client_id| {
-                let client_balance = Balance::new(client_id.clone(), Decimal::from(0));
-                arc_mutex_client_balances_1
-                    .lock()
-                    .unwrap()
-                    .insert(client_id.clone(), client_balance.clone());
-                Box::pin(async move { Ok(client_balance) })
-            });
         let arc_mutex_clients_2 = arc_mutex_clients.clone();
         client_balance_repository
             .expect_client_id_exists()
@@ -538,11 +514,6 @@ mod tests {
             .returning(|_| {
                 Box::pin(async { Err(ClientError::Unknown(anyhow::anyhow!("repo fail"))) })
             });
-        client_balance_repository
-            .expect_init_client_balance()
-            .returning(|_| {
-                Box::pin(async { Ok(Balance::new(ClientId::new("1").unwrap(), Decimal::ZERO)) })
-            });
         let (client_balance_repository, balance_exporter) = setup_general_mocks(
             Some((
                 client_balance_repository,
@@ -610,66 +581,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_07_given_a_client_but_not_initialized_client_balance_when_creating_it_then_it_should_return_an_error()
-     {
-        // SETUP
-        let mut client_balance_repository = MockClientBalanceRepository::default();
-        let arc_mutex_clients = Arc::new(Mutex::new(HashMap::new()));
-        let arc_mutex_clients_clone = arc_mutex_clients.clone();
-        let arc_mutex_client_balances = Arc::new(Mutex::new(HashMap::new()));
-        let arc_mutex_client_balances_clone = arc_mutex_client_balances.clone();
-        client_balance_repository
-            .expect_delete_client()
-            .returning(move |client_id| {
-                let result = arc_mutex_clients_clone.lock().unwrap().remove(client_id);
-                if result.is_some() {
-                    arc_mutex_client_balances_clone
-                        .lock()
-                        .unwrap()
-                        .remove(client_id);
-                }
-                Box::pin(async move { Ok(()) })
-            });
-        client_balance_repository
-            .expect_init_client_balance()
-            .returning(move |_| {
-                Box::pin(async move { Err(ClientError::Unknown(anyhow::anyhow!("...kaaa boom!"))) })
-            });
-
-        let (client_balance_repository, balance_exporter) = setup_general_mocks(
-            Some((
-                client_balance_repository,
-                arc_mutex_clients.clone(),
-                arc_mutex_client_balances.clone(),
-            )),
-            None,
-        );
-
-        let client_balance_service = Service::new(client_balance_repository, balance_exporter);
-
-        // GIVEN
-        let req = CreateClientRequest::new(
-            ClientName::new("John Doe").unwrap(),
-            BirthDate::new("1990-01-01").unwrap(),
-            Document::new("1234567890").unwrap(),
-            Country::new("US").unwrap(),
-        );
-
-        // WHEN
-        let result_create = client_balance_service.create_client(&req).await;
-
-        // ASSERT
-        assert!(result_create.is_err());
-        assert_eq!(
-            result_create.err().unwrap(),
-            ClientError::Unknown(anyhow::anyhow!("...kaaa boom!"))
-        );
-        assert!(arc_mutex_clients.lock().unwrap().is_empty());
-        assert!(arc_mutex_client_balances.lock().unwrap().is_empty());
-    }
-
-    #[tokio::test]
-    async fn test_08_given_a_client_created_when_credit_and_debit_balance_then_it_should_be_updated_with_the_new_balance()
+    async fn test_07_given_a_client_created_when_credit_and_debit_balance_then_it_should_be_updated_with_the_new_balance()
      {
         // SETUP
         let (client_balance_repository, balance_exporter) = setup_general_mocks(None, None);
@@ -715,7 +627,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_09_given_nonexistent_client_when_credit_balance_then_should_return_not_found() {
+    async fn test_08_given_nonexistent_client_when_credit_balance_then_should_return_not_found() {
         // SETUP
         let (client_balance_repository, balance_exporter) = setup_general_mocks(None, None);
         let client_balance_service = Service::new(client_balance_repository, balance_exporter);
@@ -738,7 +650,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_10_given_error_in_repository_when_credit_balance_then_should_return_error() {
+    async fn test_09_given_error_in_repository_when_credit_balance_then_should_return_error() {
         // SETUP
         let mut client_balance_repository = MockClientBalanceRepository::default();
         client_balance_repository
@@ -775,7 +687,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_11_given_nonexistent_client_when_debit_balance_then_should_return_not_found() {
+    async fn test_10_given_nonexistent_client_when_debit_balance_then_should_return_not_found() {
         // SETUP
         let (client_balance_repository, balance_exporter) = setup_general_mocks(None, None);
         let client_balance_service = Service::new(client_balance_repository, balance_exporter);
@@ -798,7 +710,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_12_given_error_in_repository_when_debit_balance_then_should_return_error() {
+    async fn test_11_given_error_in_repository_when_debit_balance_then_should_return_error() {
         // SETUP
         let mut client_balance_repository = MockClientBalanceRepository::default();
         client_balance_repository
@@ -835,7 +747,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_13_given_nonexistent_client_when_get_balance_then_should_return_not_found() {
+    async fn test_12_given_nonexistent_client_when_get_balance_then_should_return_not_found() {
         // SETUP
         let (client_balance_repository, balance_exporter) = setup_general_mocks(None, None);
         let client_balance_service = Service::new(client_balance_repository, balance_exporter);
@@ -858,7 +770,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_14_given_error_in_repository_when_get_balance_then_should_return_error() {
+    async fn test_13_given_error_in_repository_when_get_balance_then_should_return_error() {
         // SETUP
         let mut client_balance_repository = MockClientBalanceRepository::default();
         client_balance_repository
@@ -895,7 +807,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_15_given_nonexistent_client_when_get_client_then_should_return_not_found() {
+    async fn test_14_given_nonexistent_client_when_get_client_then_should_return_not_found() {
         // SETUP
         let (client_balance_repository, balance_exporter) = setup_general_mocks(None, None);
         let client_balance_service = Service::new(client_balance_repository, balance_exporter);
@@ -918,7 +830,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_16_given_error_in_repository_when_get_client_then_should_return_error() {
+    async fn test_15_given_error_in_repository_when_get_client_then_should_return_error() {
         // SETUP
         let mut client_balance_repository = MockClientBalanceRepository::default();
         client_balance_repository
@@ -955,7 +867,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_17_given_one_client_when_store_balances_then_balances_are_zero_and_exported() {
+    async fn test_16_given_one_client_when_store_balances_then_balances_are_zero_and_exported() {
         // SETUP
         let (client_balance_repository, balance_exporter) = setup_general_mocks(None, None);
         let client_balance_service = Service::new(client_balance_repository, balance_exporter);
@@ -993,7 +905,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_18_given_multiple_clients_when_store_balances_then_all_balances_are_zero_and_exported()
+    async fn test_17_given_multiple_clients_when_store_balances_then_all_balances_are_zero_and_exported()
      {
         // SETUP
         let (client_balance_repository, balance_exporter) = setup_general_mocks(None, None);
@@ -1055,7 +967,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_19_given_balances_negative_and_positive_when_store_balances_then_all_zero() {
+    async fn test_18_given_balances_negative_and_positive_when_store_balances_then_all_zero() {
         // SETUP
         let (client_balance_repository, balance_exporter) = setup_general_mocks(None, None);
         let client_balance_service = Service::new(client_balance_repository, balance_exporter);
@@ -1139,7 +1051,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_20_given_balances_already_zero_when_store_balances_then_exporter_receives_zero() {
+    async fn test_19_given_balances_already_zero_when_store_balances_then_exporter_receives_zero() {
         // SETUP
         let (client_balance_repository, balance_exporter) = setup_general_mocks(None, None);
         let client_balance_service = Service::new(client_balance_repository, balance_exporter);
@@ -1171,7 +1083,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_21_given_no_balances_when_store_balances_then_should_return_balances_empty() {
+    async fn test_20_given_no_balances_when_store_balances_then_should_return_balances_empty() {
         // SETUP
         let mut client_balance_repository = MockClientBalanceRepository::default();
         client_balance_repository
@@ -1196,7 +1108,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_22_given_error_on_reset_all_balances_to_zero_when_store_balances_then_return_error_and_balances_remain_unchanged()
+    async fn test_21_given_error_on_reset_all_balances_to_zero_when_store_balances_then_return_error_and_balances_remain_unchanged()
      {
         // SETUP
         let mut client_balance_repository = MockClientBalanceRepository::default();
@@ -1279,7 +1191,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_23_given_error_on_export_balances_when_store_balances_then_return_error_and_balances_remain_unchanged()
+    async fn test_22_given_error_on_export_balances_when_store_balances_then_return_error_and_balances_remain_unchanged()
      {
         // SETUP
         let mut balance_exporter = MockBalanceExporter::default();
@@ -1354,7 +1266,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_24_given_error_on_export_balances_and_merge_old_balances_when_store_balances_then_return_error_and_old_balances_are_lost()
+    async fn test_23_given_error_on_export_balances_and_merge_old_balances_when_store_balances_then_return_error_and_old_balances_are_lost()
      {
         // SETUP
         let mut client_balance_repository = MockClientBalanceRepository::default();
