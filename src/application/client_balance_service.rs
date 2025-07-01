@@ -95,6 +95,10 @@ where
                 client.id()
             );
             self.client_repository.delete_client(client.id()).await?;
+            return Err(ClientError::Unknown(anyhow::anyhow!(
+                "Error initializing client: {:?}",
+                e
+            )));
         }
 
         Ok(client)
@@ -184,13 +188,21 @@ mod tests {
 
     use super::*;
 
-    fn setup_mocks() -> (MockClientBalanceRepository, MockBalanceExporter) {
-        let balance_exporter = MockBalanceExporter::default();
-        let (arc_mutex_clients, arc_mutex_client_balances) = (
-            Arc::new(Mutex::new(HashMap::new())),
-            Arc::new(Mutex::new(HashMap::new())),
-        );
-        let mut client_balance_repository = MockClientBalanceRepository::default();
+    type ClientsHashMap = Arc<Mutex<HashMap<ClientId, Client>>>;
+    type ClientBalancesHashMap = Arc<Mutex<HashMap<ClientId, Balance>>>;
+
+    fn setup_general_mocks(
+        client_balance_repository: Option<(
+            MockClientBalanceRepository,
+            ClientsHashMap,
+            ClientBalancesHashMap,
+        )>,
+        balance_exporter: Option<MockBalanceExporter>,
+    ) -> (MockClientBalanceRepository, MockBalanceExporter) {
+        let balance_exporter = balance_exporter.unwrap_or_default();
+
+        let (mut client_balance_repository, arc_mutex_clients, arc_mutex_client_balances) =
+            client_balance_repository.unwrap_or_default();
         let (arc_mutex_clients_1, arc_mutex_client_balances_1) =
             (arc_mutex_clients.clone(), arc_mutex_client_balances.clone());
         client_balance_repository
@@ -319,13 +331,38 @@ mod tests {
                 }
             });
 
+        client_balance_repository
+            .expect_are_balances_empty()
+            .returning(move || Box::pin(async move { Ok(false) }));
+
+        let arc_mutex_clients_4 = arc_mutex_clients.clone();
+        client_balance_repository
+            .expect_get_client()
+            .returning(move |req| {
+                let client_id_clone = req.client_id().clone();
+                let result = arc_mutex_clients_4
+                    .lock()
+                    .unwrap()
+                    .get(req.client_id())
+                    .cloned();
+                if let Some(client) = result {
+                    Box::pin(async move { Ok(client) })
+                } else {
+                    Box::pin(async move {
+                        Err(ClientError::NotFoundById {
+                            id_document: client_id_clone.clone(),
+                        })
+                    })
+                }
+            });
+
         (client_balance_repository, balance_exporter)
     }
 
     #[tokio::test]
     async fn test_01_given_a_client_when_creating_it_then_it_should_return_the_client_id_created() {
         // SETUP
-        let (client_balance_repository, balance_exporter) = setup_mocks();
+        let (client_balance_repository, balance_exporter) = setup_general_mocks(None, None);
         let client_balance_service = Service::new(client_balance_repository, balance_exporter);
 
         // GIVEN
@@ -348,7 +385,7 @@ mod tests {
     async fn test_02_given_two_clients_with_the_same_document_when_creating_it_then_it_should_return_an_error()
      {
         // SETUP
-        let (client_balance_repository, balance_exporter) = setup_mocks();
+        let (client_balance_repository, balance_exporter) = setup_general_mocks(None, None);
         let client_balance_service = Service::new(client_balance_repository, balance_exporter);
 
         // GIVEN
@@ -385,7 +422,7 @@ mod tests {
     async fn test_03_given_a_client_created_when_getting_client_balance_then_it_should_return_the_client_balance_equal_to_zero()
      {
         // SETUP
-        let (client_balance_repository, balance_exporter) = setup_mocks();
+        let (client_balance_repository, balance_exporter) = setup_general_mocks(None, None);
         let client_balance_service = Service::new(client_balance_repository, balance_exporter);
 
         // GIVEN
@@ -411,10 +448,75 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_04_given_a_client_created_when_credit_balance_then_it_should_be_updated_with_the_new_balance()
+    async fn test_04_given_a_client_created_when_getting_client_then_it_should_return_the_client_info()
      {
         // SETUP
-        let (client_balance_repository, balance_exporter) = setup_mocks();
+        let (client_balance_repository, balance_exporter) = setup_general_mocks(None, None);
+        let client_balance_service = Service::new(client_balance_repository, balance_exporter);
+
+        // GIVEN
+        let client_name = "John Doe";
+        let birth_date = "1990-01-01";
+        let document = "1234567890";
+        let country = "US";
+        let req_create = CreateClientRequest::new(
+            ClientName::new(client_name).unwrap(),
+            BirthDate::new(birth_date).unwrap(),
+            Document::new(document).unwrap(),
+            Country::new(country).unwrap(),
+        );
+        let result_create = client_balance_service.create_client(&req_create).await;
+        let client_id = result_create.unwrap().id().clone();
+
+        // WHEN
+        let req_get = GetClientRequest::new(client_id.clone());
+        let result_get = client_balance_service.get_client_by_id(&req_get).await;
+
+        // ASSERT
+        assert!(result_get.is_ok());
+        let client = result_get.unwrap();
+        assert_eq!(client.name(), &ClientName::new(client_name).unwrap());
+        assert_eq!(client.birth_date(), &BirthDate::new(birth_date).unwrap());
+        assert_eq!(client.document(), &Document::new(document).unwrap());
+        assert_eq!(client.country(), &Country::new(country).unwrap());
+    }
+
+    #[tokio::test]
+    async fn test_05_given_a_client_but_not_initialized_client_balance_when_creating_it_then_it_should_return_an_error()
+     {
+        // SETUP
+        let mut client_balance_repository = MockClientBalanceRepository::default();
+        let arc_mutex_clients = Arc::new(Mutex::new(HashMap::new()));
+        let arc_mutex_clients_clone = arc_mutex_clients.clone();
+        let arc_mutex_client_balances = Arc::new(Mutex::new(HashMap::new()));
+        let arc_mutex_client_balances_clone = arc_mutex_client_balances.clone();
+        client_balance_repository
+            .expect_delete_client()
+            .returning(move |client_id| {
+                let result = arc_mutex_clients_clone.lock().unwrap().remove(client_id);
+                if result.is_some() {
+                    arc_mutex_client_balances_clone
+                        .lock()
+                        .unwrap()
+                        .remove(client_id);
+                }
+                Box::pin(async move { Ok(()) })
+            });
+        client_balance_repository
+            .expect_init_client_balance()
+            .returning(move |_| {
+                Box::pin(async move { Err(ClientError::Unknown(anyhow::anyhow!("...kaaa boom!"))) })
+            });
+
+        let (client_balance_repository, balance_exporter) = setup_general_mocks(
+            Some((
+                client_balance_repository,
+                arc_mutex_clients.clone(),
+                arc_mutex_client_balances.clone(),
+            )),
+            None,
+        );
+
         let client_balance_service = Service::new(client_balance_repository, balance_exporter);
 
         // GIVEN
@@ -425,34 +527,24 @@ mod tests {
             Country::new("US").unwrap(),
         );
 
-        let result = client_balance_service.create_client(&req).await.unwrap();
-        let client_id = result.id();
-        let req_transaction =
-            CreditTransactionRequest::new(client_id.clone(), Decimal::from(100)).unwrap();
-        let req_get = GetClientRequest::new(client_id.clone());
-
         // WHEN
-        let result_transaction = client_balance_service
-            .credit_balance(&req_transaction)
-            .await
-            .unwrap();
-        let result_get = client_balance_service
-            .get_balance_by_client_id(&req_get)
-            .await
-            .unwrap();
+        let result_create = client_balance_service.create_client(&req).await;
 
         // ASSERT
-        assert_eq!(result_transaction.balance(), &Decimal::from(100));
-        assert_eq!(result_transaction.client_id(), client_id);
-        assert_eq!(result_get.balance(), &Decimal::from(100));
-        assert_eq!(result_get.client_id(), client_id);
+        assert!(result_create.is_err());
+        assert_eq!(
+            result_create.err().unwrap(),
+            ClientError::Unknown(anyhow::anyhow!("...kaaa boom!"))
+        );
+        assert!(arc_mutex_clients.lock().unwrap().is_empty());
+        assert!(arc_mutex_client_balances.lock().unwrap().is_empty());
     }
 
     #[tokio::test]
-    async fn test_05_given_a_client_created_when_credit_and_debit_balance_then_it_should_be_updated_with_the_new_balance()
+    async fn test_06_given_a_client_created_when_credit_and_debit_balance_then_it_should_be_updated_with_the_new_balance()
      {
         // SETUP
-        let (client_balance_repository, balance_exporter) = setup_mocks();
+        let (client_balance_repository, balance_exporter) = setup_general_mocks(None, None);
         let client_balance_service = Service::new(client_balance_repository, balance_exporter);
 
         // GIVEN
