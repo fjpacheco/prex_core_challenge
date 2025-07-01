@@ -2,7 +2,7 @@
 
 # Prex Core Challenge
 
-Microservicio de pagos (mini procesador de pagos) en **Rust**, implementado con una **arquitectura hexagonal**. Permite gestionar clientes y sus balances, acreditando, debitando, consultando y exportando saldos a través de una API REST. La solución está diseñada para que la persistencia y exportación de datos sea flexible: por defecto, los datos se mantienen en memoria y se exportan a archivos. El proyecto prioriza buenas prácticas de ingeniería de software, aplicando principios de buen diseño y testeo exhaustivo en la lógica de negocio. Ideal como ejemplo de arquitectura limpia, escalable y mantenible en Rust.
+Microservicio de pagos (mini procesador de pagos) en **Rust**, implementado con una **arquitectura hexagonal**. Permite gestionar clientes y sus balances, acreditando, debitando, consultando y exportando saldos a través de una API REST. La solución está diseñada para que la persistencia y exportación de datos sea flexible: por defecto, los datos se mantienen en memoria y se exportan a archivos. El proyecto prioriza buenas prácticas de ingeniería de software, aplicando principios de buen diseño y testeo exhaustivo en la lógica de negocio, obteniendo una alta cobertura de pruebas. Ideal como ejemplo de arquitectura limpia, escalable y mantenible en Rust.
 
 <details>
 <summary><b>Definición de requerimientos</b></summary>
