@@ -10,6 +10,7 @@ use crate::domain::model::entity::client::Client;
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, From)]
 pub struct DebitTransactionRequest {
     client_id: ClientId,
+    /// The amount to debit from the [Client] balance. Always negative.
     amount: Decimal,
 }
 

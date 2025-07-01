@@ -34,6 +34,23 @@ impl InMemoryRepository {
             client_balances: Arc::new(Mutex::new(HashMap::new())),
         }
     }
+
+    async fn update_balance(
+        &self,
+        client_id: &ClientId,
+        amount: &Decimal,
+    ) -> Result<Balance, ClientError> {
+        let mut client_balances = self.client_balances.lock().await;
+        let client_balance =
+            client_balances
+                .get_mut(client_id)
+                .ok_or(ClientError::NotFoundById {
+                    id_document: client_id.clone(),
+                })?;
+        let new_decimal_balance = client_balance.balance() + amount;
+        client_balance.set_balance(new_decimal_balance);
+        Ok(client_balance.clone())
+    }
 }
 
 impl ClientBalanceRepository for InMemoryRepository {
@@ -94,16 +111,7 @@ impl ClientBalanceRepository for InMemoryRepository {
     }
 
     async fn credit_balance(&self, req: &CreditTransactionRequest) -> Result<Balance, ClientError> {
-        let mut client_balances = self.client_balances.lock().await;
-        let client_balance =
-            client_balances
-                .get_mut(req.client_id())
-                .ok_or(ClientError::NotFoundById {
-                    id_document: req.client_id().clone(),
-                })?;
-        let new_decimal_balance = client_balance.balance() + req.amount();
-        client_balance.set_balance(new_decimal_balance);
-        Ok(client_balance.clone())
+        self.update_balance(req.client_id(), req.amount()).await
     }
 
     async fn get_client(&self, req: &GetClientRequest) -> Result<Client, ClientError> {
@@ -117,16 +125,7 @@ impl ClientBalanceRepository for InMemoryRepository {
     }
 
     async fn debit_balance(&self, req: &DebitTransactionRequest) -> Result<Balance, ClientError> {
-        let mut client_balances = self.client_balances.lock().await;
-        let client_balance =
-            client_balances
-                .get_mut(req.client_id())
-                .ok_or(ClientError::NotFoundById {
-                    id_document: req.client_id().clone(),
-                })?;
-        let new_decimal_balance = client_balance.balance() + req.amount();
-        client_balance.set_balance(new_decimal_balance);
-        Ok(client_balance.to_owned())
+        self.update_balance(req.client_id(), req.amount()).await
     }
 
     async fn get_balance_by_client_id(

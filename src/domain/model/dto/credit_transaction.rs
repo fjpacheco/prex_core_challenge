@@ -10,6 +10,7 @@ use crate::domain::model::entity::client::Client;
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, From)]
 pub struct CreditTransactionRequest {
     client_id: ClientId,
+    /// The amount to credit to the [Client] balance. Always positive.
     amount: Decimal,
 }
 
