@@ -1,13 +1,12 @@
 use std::{
     collections::HashMap,
     sync::{
-        Arc,
+        Arc, Mutex, MutexGuard,
         atomic::{AtomicUsize, Ordering},
     },
 };
 
 use rust_decimal::Decimal;
-use tokio::sync::Mutex;
 
 use crate::domain::{
     model::{
@@ -22,7 +21,10 @@ use crate::domain::{
     port::outbound::client_balance_repository::ClientBalanceRepository,
 };
 
+type GuardMutexClients<'a> = MutexGuard<'a, HashMap<ClientId, (Client, Decimal)>>;
+
 pub struct InMemoryRepository {
+    /// Recomiendo leer el README para entender el uso de Mutex sincronico de la std.
     clients: Arc<Mutex<HashMap<ClientId, (Client, Decimal)>>>,
     id_counter: AtomicUsize,
 }
@@ -40,13 +42,18 @@ impl InMemoryRepository {
             id_counter: AtomicUsize::new(0),
         }
     }
-
-    async fn update_balance(
+    fn guard_clients(&self) -> Result<GuardMutexClients, anyhow::Error> {
+        match self.clients.lock() {
+            Ok(lock) => Ok(lock),
+            Err(e) => Err(anyhow::anyhow!("Poisoned lock on clients: {}", e)),
+        }
+    }
+    fn update_balance(
         &self,
         client_id: &ClientId,
         amount: &Decimal,
     ) -> Result<Balance, ClientError> {
-        let mut clients = self.clients.lock().await;
+        let mut clients = self.guard_clients()?;
         let client_balance = clients
             .get_mut(client_id)
             .ok_or(ClientError::NotFoundById {
@@ -68,7 +75,7 @@ impl ClientBalanceRepository for InMemoryRepository {
             req.document().clone(),
             req.country().clone(),
         );
-        let mut clients = self.clients.lock().await;
+        let mut clients = self.guard_clients()?;
         if clients
             .iter()
             .any(|(_, (client, _))| client.document() == req.document())
@@ -82,12 +89,12 @@ impl ClientBalanceRepository for InMemoryRepository {
     }
 
     async fn client_id_exists(&self, client_id: &ClientId) -> Result<bool, ClientError> {
-        let clients = self.clients.lock().await;
+        let clients = self.guard_clients()?;
         Ok(clients.contains_key(client_id))
     }
 
     async fn get_client_by_document(&self, document: &Document) -> Result<Client, ClientError> {
-        let clients = self.clients.lock().await;
+        let clients = self.guard_clients()?;
         let (_, (client, _)) = clients
             .iter()
             .find(|(_, (client, _))| client.document() == document)
@@ -98,11 +105,11 @@ impl ClientBalanceRepository for InMemoryRepository {
     }
 
     async fn credit_balance(&self, req: &CreditTransactionRequest) -> Result<Balance, ClientError> {
-        self.update_balance(req.client_id(), req.amount()).await
+        self.update_balance(req.client_id(), req.amount())
     }
 
     async fn get_client(&self, req: &GetClientRequest) -> Result<Client, ClientError> {
-        let clients = self.clients.lock().await;
+        let clients = self.guard_clients()?;
         let (client, _) = clients
             .get(req.client_id())
             .ok_or(ClientError::NotFoundById {
@@ -112,14 +119,14 @@ impl ClientBalanceRepository for InMemoryRepository {
     }
 
     async fn debit_balance(&self, req: &DebitTransactionRequest) -> Result<Balance, ClientError> {
-        self.update_balance(req.client_id(), req.amount()).await
+        self.update_balance(req.client_id(), req.amount())
     }
 
     async fn get_balance_by_client_id(
         &self,
         req: &GetClientRequest,
     ) -> Result<Balance, ClientError> {
-        let client_balances = self.clients.lock().await;
+        let client_balances = self.guard_clients()?;
         let (client, balance) =
             client_balances
                 .get(req.client_id())
@@ -130,7 +137,7 @@ impl ClientBalanceRepository for InMemoryRepository {
     }
 
     async fn reset_all_balances_to_zero(&self) -> Result<Vec<Balance>, ClientError> {
-        let mut clients = self.clients.lock().await;
+        let mut clients = self.guard_clients()?;
         let old_balances = clients
             .values_mut()
             .map(|(client, balance)| {
@@ -143,7 +150,7 @@ impl ClientBalanceRepository for InMemoryRepository {
     }
 
     async fn are_balances_empty(&self) -> Result<bool, ClientError> {
-        let clients = self.clients.lock().await;
+        let clients = self.guard_clients()?;
         Ok(clients.is_empty())
     }
 
@@ -151,7 +158,7 @@ impl ClientBalanceRepository for InMemoryRepository {
         &self,
         old_client_balances: Vec<Balance>,
     ) -> Result<(), ClientError> {
-        let mut clients = self.clients.lock().await;
+        let mut clients = self.guard_clients()?;
         old_client_balances.iter().for_each(|old_client_balance| {
             let old_balance = old_client_balance.balance();
             if let Some((_, balance)) = clients.get_mut(old_client_balance.client_id()) {
