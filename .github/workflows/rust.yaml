@@ -51,6 +51,8 @@ jobs:
     #     token: ${{ secrets.CODECOV_TOKEN }}
     #     files: lcov.info
     #     fail_ci_if_error: true
+    - name: Prepare binary for upload
+      run: mv target/debug/prex_core_challenge prex_core_challenge
 
     - name: Upload binary to EC2
       uses: appleboy/scp-action@v0.1.4
@@ -58,9 +60,8 @@ jobs:
         host: ${{ secrets.EC2_HOST }}
         username: ${{ secrets.EC2_USER }}
         key: ${{ secrets.EC2_SSH_KEY }}
-        source: "target/debug/prex_core_challenge"
+        source: "prex_core_challenge"
         target: "/home/${{ secrets.EC2_USER }}/prex_core_challenge"
-        strip_components: 2
         overwrite: true
 
     - name: Restart app on EC2
