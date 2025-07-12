@@ -41,11 +41,34 @@ jobs:
 
     - name: Install cargo-llvm-cov
       uses: taiki-e/install-action@cargo-llvm-cov
+
     - name: Generate code coverage
       run: cargo llvm-cov --ignore-filename-regex "infrastructure|main.rs" --all-features --workspace --lcov --output-path lcov.info
+
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v3
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
         files: lcov.info
         fail_ci_if_error: true
+
+    - name: Upload binary to EC2
+      uses: appleboy/scp-action@v0.1.4
+      with:
+        host: ${{ secrets.EC2_HOST }}
+        username: ${{ secrets.EC2_USER }}
+        key: ${{ secrets.EC2_SSH_KEY }}
+        source: "target/debug/prex_core_challenge"
+        target: "/home/${{ secrets.EC2_USER }}/prex_core_challenge"
+        ssh_option: "-o StrictHostKeyChecking=no"
+
+    - name: Restart app on EC2
+      uses: appleboy/ssh-action@v1.0.0
+      with:
+        host: ${{ secrets.EC2_HOST }}
+        username: ${{ secrets.EC2_USER }}
+        key: ${{ secrets.EC2_SSH_KEY }}
+        script: |
+          pkill prex_core_challenge || true
+          nohup /home/${{ secrets.EC2_USER }}/prex_core_challenge > app.log 2>&1 &
+        ssh_option: "-o StrictHostKeyChecking=no"
