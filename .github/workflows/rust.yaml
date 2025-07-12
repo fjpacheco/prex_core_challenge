@@ -52,10 +52,7 @@ jobs:
     #     files: lcov.info
     #     fail_ci_if_error: true
     - name: Prepare binary for upload
-      run: |
-        mkdir -p /app
-        mv target/debug/prex_core_challenge /app/prex_core_challenge
-        mv prex_core_challenge.service /app/prex_core_challenge.service
+      run: mv target/debug/prex_core_challenge prex_core_challenge
 
     - name: Upload binary to EC2
       uses: appleboy/scp-action@v0.1.4
@@ -63,10 +60,10 @@ jobs:
         host: ${{ secrets.EC2_HOST }}
         username: ${{ secrets.EC2_USER }}
         key: ${{ secrets.EC2_SSH_KEY }}
-        debug: true
         source: |
-          /app/*
-        target: "/home/${{ secrets.EC2_USER }}"
+          prex_core_challenge
+          prex_core_challenge.service
+        target: "/home/${{ secrets.EC2_USER }}/app"
         overwrite: true
 
     - name: Ensure systemd service exists
