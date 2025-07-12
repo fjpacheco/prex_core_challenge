@@ -60,6 +60,8 @@ jobs:
         key: ${{ secrets.EC2_SSH_KEY }}
         source: "target/debug/prex_core_challenge"
         target: "/home/${{ secrets.EC2_USER }}/prex_core_challenge"
+        strip_components: 2
+        overwrite: true
 
     - name: Restart app on EC2
       uses: appleboy/ssh-action@v1.0.0
