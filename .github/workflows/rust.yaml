@@ -73,4 +73,4 @@ jobs:
         script: |
           chmod +x /home/${{ secrets.EC2_USER }}/app/prex_core_challenge
           pkill prex_core_challenge || true
-          nohup /home/${{ secrets.EC2_USER }}/app/prex_core_challenge > app.log 2>&1 &
+          nohup /home/${{ secrets.EC2_USER }}/app/prex_core_challenge > /home/${{ secrets.EC2_USER }}/app/app.log 2>&1 &
