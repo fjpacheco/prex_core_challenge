@@ -61,7 +61,7 @@ jobs:
         username: ${{ secrets.EC2_USER }}
         key: ${{ secrets.EC2_SSH_KEY }}
         source: "prex_core_challenge"
-        target: "/home/${{ secrets.EC2_USER }}/prex_core_challenge"
+        target: "/home/${{ secrets.EC2_USER }}/app"
         overwrite: true
 
     - name: Restart app on EC2
@@ -71,6 +71,6 @@ jobs:
         username: ${{ secrets.EC2_USER }}
         key: ${{ secrets.EC2_SSH_KEY }}
         script: |
-          chmod +x /home/${{ secrets.EC2_USER }}/prex_core_challenge
+          chmod +x /home/${{ secrets.EC2_USER }}/app/prex_core_challenge
           pkill prex_core_challenge || true
-          nohup /home/${{ secrets.EC2_USER }}/prex_core_challenge > app.log 2>&1 &
+          nohup /home/${{ secrets.EC2_USER }}/app/prex_core_challenge > app.log 2>&1 &
