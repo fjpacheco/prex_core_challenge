@@ -52,7 +52,10 @@ jobs:
     #     files: lcov.info
     #     fail_ci_if_error: true
     - name: Prepare binary for upload
-      run: mv target/debug/prex_core_challenge /app/prex_core_challenge && mv prex_core_challenge.service /app/prex_core_challenge.service
+      run: |
+        mkdir -p /app
+        mv target/debug/prex_core_challenge /app/prex_core_challenge
+        mv prex_core_challenge.service /app/prex_core_challenge.service
 
     - name: Upload binary to EC2
       uses: appleboy/scp-action@v0.1.4
