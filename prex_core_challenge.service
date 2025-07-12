@@ -1,6 +1,8 @@
 [Unit]
 Description=Prex Core Challenge API
 After=network.target
+StartLimitIntervalSec=180
+StartLimitBurst=16
 
 [Service]
 User=ec2-user
