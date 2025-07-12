@@ -1,0 +1,17 @@
+[Unit]
+Description=Prex Core Challenge API
+After=network.target
+StartLimitIntervalSec=180
+StartLimitBurst=16
+
+[Service]
+User=ec2-user
+WorkingDirectory=/home/ec2-user/app
+ExecStart=/home/ec2-user/app/prex_core_challenge
+Restart=always
+RestartSec=3
+Environment=RUST_LOG=info
+Environment=HOST=0.0.0.0
+
+[Install]
+WantedBy=multi-user.target 

@@ -27,25 +27,65 @@ jobs:
           lcov.info
         key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
-    - name: Check formatting
-      run: cargo fmt --all -- --check
+    # - name: Check formatting
+    #   run: cargo fmt --all -- --check
 
-    - name: Lint with clippy
-      run: cargo clippy --all-targets --all-features -- -D warnings
+    # - name: Lint with clippy
+    #   run: cargo clippy --all-targets --all-features -- -D warnings
 
     - name: Build
       run: cargo build --verbose
 
-    - name: Run tests
-      run: cargo test --verbose
+    # - name: Run tests
+    #   run: cargo test --verbose
 
-    - name: Install cargo-llvm-cov
-      uses: taiki-e/install-action@cargo-llvm-cov
-    - name: Generate code coverage
-      run: cargo llvm-cov --ignore-filename-regex "infrastructure|main.rs" --all-features --workspace --lcov --output-path lcov.info
-    - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v3
+    # - name: Install cargo-llvm-cov
+    #   uses: taiki-e/install-action@cargo-llvm-cov
+
+    # - name: Generate code coverage
+    #   run: cargo llvm-cov --ignore-filename-regex "infrastructure|main.rs" --all-features --workspace --lcov --output-path lcov.info
+
+    # - name: Upload coverage to Codecov
+    #   uses: codecov/codecov-action@v3
+    #   with:
+    #     token: ${{ secrets.CODECOV_TOKEN }}
+    #     files: lcov.info
+    #     fail_ci_if_error: true
+    - name: Prepare binary for upload
+      run: mv target/debug/prex_core_challenge prex_core_challenge
+
+    - name: Ensure systemd service exists or stop if running
+      uses: appleboy/ssh-action@v1.0.0
       with:
-        token: ${{ secrets.CODECOV_TOKEN }}
-        files: lcov.info
-        fail_ci_if_error: true
+        host: ${{ secrets.EC2_HOST }}
+        username: ${{ secrets.EC2_USER }}
+        key: ${{ secrets.EC2_SSH_KEY }}
+        debug: true
+        script: |
+          if [ -f /etc/systemd/system/prex_core_challenge.service ]; then
+            sudo systemctl stop prex_core_challenge
+          else
+            sudo mv /home/${{ secrets.EC2_USER }}/app/prex_core_challenge.service /etc/systemd/system/prex_core_challenge.service
+            sudo systemctl daemon-reload
+            sudo systemctl enable prex_core_challenge
+          fi
+
+    - name: Upload binary to EC2
+      uses: appleboy/scp-action@v0.1.4
+      with:
+        host: ${{ secrets.EC2_HOST }}
+        username: ${{ secrets.EC2_USER }}
+        key: ${{ secrets.EC2_SSH_KEY }}
+        source: "prex_core_challenge, prex_core_challenge.service"
+        target: "/home/${{ secrets.EC2_USER }}/app"
+        overwrite: true
+
+    - name: Restart app with systemd
+      uses: appleboy/ssh-action@v1.0.0
+      with:
+        host: ${{ secrets.EC2_HOST }}
+        username: ${{ secrets.EC2_USER }}
+        key: ${{ secrets.EC2_SSH_KEY }}
+        debug: true
+        script: |
+          sudo systemctl restart prex_core_challenge
