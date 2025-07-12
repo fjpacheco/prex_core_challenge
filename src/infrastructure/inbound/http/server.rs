@@ -19,7 +19,7 @@ use crate::{
     },
 };
 
-const DEFAULT_HOST: &str = "127.0.0.1";
+const DEFAULT_HOST: &str = "0.0.0.0";
 const DEFAULT_PORT: u16 = 8080;
 
 pub struct HttpServer {
