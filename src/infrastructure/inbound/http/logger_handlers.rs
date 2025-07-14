@@ -101,9 +101,10 @@ pub async fn get_all_logs_zip() -> HttpResponse {
                 }
             }
             let _ = zip.finish();
+            let filename = format!("logs_{}.zip", Local::now().format("%Y-%m-%d_%H-%M-%S"));
             HttpResponse::Ok()
                 .insert_header((header::CONTENT_TYPE, "application/zip"))
-                .insert_header((header::CONTENT_DISPOSITION, "attachment; filename=logs.zip"))
+                .insert_header((header::CONTENT_DISPOSITION, format!("attachment; filename={filename}")))
                 .body(buffer)
         }
         Err(e) => HttpResponse::InternalServerError().body(format!("Error reading log dir: {e}")),
