@@ -8,7 +8,7 @@ use prex_core_challenge::{
 
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
-    CustomLogger::init_logger();
+    let _custom_logger = CustomLogger::init_logger();
 
     let file_exporter = FileExporter::new().await?;
 
