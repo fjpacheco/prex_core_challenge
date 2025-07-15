@@ -15,7 +15,7 @@ jobs:
     name: Check formatting, lint, build and tests! 🚀
     defaults:
       run:
-        working-directory: ./app
+        working-directory: ./api
 
     steps:
     - uses: actions/checkout@v4
@@ -81,7 +81,7 @@ jobs:
         host: ${{ secrets.EC2_HOST }}
         username: ${{ secrets.EC2_USER }}
         key: ${{ secrets.EC2_SSH_KEY }}
-        source: "prex_core_challenge, prex_core_challenge.service"
+        source: "api/prex_core_challenge, app/prex_core_challenge.service"
         target: "/home/${{ secrets.EC2_USER }}/app"
         overwrite: true
 
