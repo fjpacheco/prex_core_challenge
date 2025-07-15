@@ -13,6 +13,9 @@ jobs:
   build:
     runs-on: ubuntu-latest
     name: Check formatting, lint, build and tests! 🚀
+    defaults:
+      run:
+        working-directory: ./app
 
     steps:
     - uses: actions/checkout@v4
@@ -26,6 +29,7 @@ jobs:
           target
           lcov.info
         key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
 
     - name: Check formatting
       run: cargo fmt --all -- --check
