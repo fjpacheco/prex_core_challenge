@@ -59,6 +59,17 @@ jobs:
     - name: Prepare binary for upload
       run: mv target/release/prex_core_challenge prex_core_challenge
 
+    - name: Upload binary to EC2
+      uses: appleboy/scp-action@v0.1.4
+      with:
+        host: ${{ secrets.EC2_HOST }}
+        username: ${{ secrets.EC2_USER }}
+        key: ${{ secrets.EC2_SSH_KEY }}
+        source: "api/prex_core_challenge, api/prex_core_challenge.service"
+        target: "/home/${{ secrets.EC2_USER }}/app"
+        overwrite: true
+        strip_components: 1
+
     - name: Ensure systemd service exists or stop if running
       uses: appleboy/ssh-action@v1.0.0
       with:
@@ -75,17 +86,6 @@ jobs:
             sudo systemctl enable prex_core_challenge
           fi
 
-    - name: Upload binary to EC2
-      uses: appleboy/scp-action@v0.1.4
-      with:
-        host: ${{ secrets.EC2_HOST }}
-        username: ${{ secrets.EC2_USER }}
-        key: ${{ secrets.EC2_SSH_KEY }}
-        source: "api/prex_core_challenge, api/prex_core_challenge.service"
-        target: "/home/${{ secrets.EC2_USER }}/app"
-        overwrite: true
-        strip_components: 1
-
     - name: Restart app with systemd
       uses: appleboy/ssh-action@v1.0.0
       with:
@@ -95,3 +95,6 @@ jobs:
         debug: true
         script: |
           sudo systemctl restart prex_core_challenge
+
+
+    
