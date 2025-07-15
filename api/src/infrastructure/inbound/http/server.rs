@@ -7,8 +7,10 @@ use std::sync::Arc;
 use tracing_actix_web::TracingLogger;
 
 use crate::{
-    CREATE_CLIENT_METHOD, GET_CLIENT_BALANCE_METHOD, NEW_CREDIT_TRANSACTION_METHOD,
-    NEW_DEBIT_TRANSACTION_METHOD, STORE_BALANCES_METHOD,
+    CREATE_CLIENT_METHOD, DELETE_ALL_LOG_FILES_METHOD, DELETE_LOG_FILE_METHOD,
+    GET_ALL_LOGS_ZIP_METHOD, GET_CLIENT_BALANCE_METHOD, GET_LOG_FILE_METHOD, GET_LOG_FILES_METHOD,
+    GET_LOG_TAIL_METHOD, NEW_CREDIT_TRANSACTION_METHOD, NEW_DEBIT_TRANSACTION_METHOD,
+    STORE_BALANCES_METHOD, WS_LOG_HANDLER,
     domain::port::inbound::client_balance_service::ClientBalanceService,
     infrastructure::inbound::http::{
         client_balance_handlers::{
@@ -16,10 +18,15 @@ use crate::{
             NEW_DEBIT_TRANSACTION_ROUTE, STORE_BALANCES_ROUTE,
         },
         logger::CustomLogger,
+        logger_handlers::{
+            DELETE_ALL_LOG_FILES_ROUTE, DELETE_LOG_FILE_ROUTE, GET_ALL_LOGS_ZIP_ROUTE,
+            GET_LOG_FILE_ROUTE, GET_LOG_FILES_ROUTE, GET_LOG_TAIL_ROUTE,
+        },
+        ws_logger::WS_LOG_HANDLER_ROUTE,
     },
 };
 
-const DEFAULT_HOST: &str = "127.0.0.1";
+const DEFAULT_HOST: &str = "0.0.0.0";
 const DEFAULT_PORT: u16 = 8080;
 
 pub struct HttpServer {
@@ -86,4 +93,11 @@ fn app_builder<T: ClientBalanceService>(
             NEW_DEBIT_TRANSACTION_METHOD!(T),
         )
         .route(STORE_BALANCES_ROUTE, STORE_BALANCES_METHOD!(T))
+        .route(WS_LOG_HANDLER_ROUTE, WS_LOG_HANDLER!())
+        .route(GET_LOG_FILES_ROUTE, GET_LOG_FILES_METHOD!())
+        .route(GET_ALL_LOGS_ZIP_ROUTE, GET_ALL_LOGS_ZIP_METHOD!())
+        .route(DELETE_ALL_LOG_FILES_ROUTE, DELETE_ALL_LOG_FILES_METHOD!())
+        .route(GET_LOG_TAIL_ROUTE, GET_LOG_TAIL_METHOD!())
+        .route(GET_LOG_FILE_ROUTE, GET_LOG_FILE_METHOD!())
+        .route(DELETE_LOG_FILE_ROUTE, DELETE_LOG_FILE_METHOD!())
 }
